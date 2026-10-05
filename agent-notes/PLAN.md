@@ -118,10 +118,9 @@ Project 2 precedents are noted where they apply. Each is an assumption until the
 2. Who writes the FK math: the summary says "no library" but not that the owner must write it. Project 2
    split the work this way (owner writes physics/PID, agents write transport and wiring), so this plan
    assumes the same split for `urdf.py`, `transform.py`, and `fk.py`. Confirm before implementation.
-3. Advertise rule: Project 1 gates external wire `publish` on an advertisement; Project 2 does not.
-   Project 3 follows Project 1 (reuse the gateway). Confirm whether a grader publishing `/joint_states`
-   over the wire will advertise first. Internal nodes publish in-process via `registry.publish`, which is
-   not gated (Project 2 precedent).
+3. Advertise rule (decided): Project 3 follows Project 1. The gateway gates external wire `publish` on an
+   active advertisement, and an unadvertised publish is silently dropped. Project 2's relaxed rule does not
+   apply. Internal nodes publish in-process via `registry.publish`, which is not gated (Project 2 precedent).
 4. Node topology: assumed in-process on one asyncio loop, as in Projects 1 and 2 (Project 2 precedent).
 5. Quaternion convention (`w,x,y,z` vs `x,y,z,w`) in `/tf` and `/xform_world`: no precedent. Open.
 6. Message shapes: assumed ROS-style, matching Project 2: `header: {stamp: {sec, nanosec}, frame_id}`
