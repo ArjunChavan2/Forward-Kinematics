@@ -114,7 +114,12 @@ The `make demo` nodes (`joint_state_publisher`, `finite_state_machine`) come aft
 7. `robot_world_state_publisher.py`: `/tf` and `/global_pose` → `/xform_world`.
 8. `main.py` wiring; `make run` readiness check within 10 s.
 9. Integration tests over the wire using `client_helper.py`.
-10. `make demo` (ungraded), then the FSM and portfolio.
+10. `joint_state_publisher.py` (ungraded, `make demo` only): reads `robot_description`, subscribes
+    `/joint_trajectory`, keeps setpoints by joint name (including names not yet loaded), servos joints toward
+    setpoints clamped to limits, publishes `/joint_states` at about 10 Hz. Reset service optional.
+11. `finite_state_machine.py` (ungraded, `make demo` only): FSM document per FK_API, `/fsm/*` services,
+    `/fsm/status`, saved files under `fsm/` with validated identifiers.
+12. `make demo` wiring, then the portfolio viewer and video.
 
 ## Edge cases and failure modes
 
