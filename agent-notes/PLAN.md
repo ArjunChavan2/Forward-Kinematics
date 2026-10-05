@@ -70,8 +70,11 @@ subscriptions on the registry:
   translation and rotation. Everything uses the `(a, b, c, d)` = `(w, x, y, z)` convention from the plan.
 - `src/fk.py` — kinematic tree build (root link, parent/child map), traversal, `T_root_child`
   composition from `q`, quaternion output.
-- `src/robot_state_publisher.py` — on `robot_description` set, parse and validate, store model;
-  subscribe `/joint_states`, compute, publish `/tf` at least 5 Hz via a timer task.
+- `src/robot_state_publisher.py` — reloads whenever `robot_description` reaches a higher version than the
+  one loaded. Parses and validates the new description. If it is rejected, keeps the previous robot and
+  `/tf` unchanged. Publishes `/robot_state_publisher/description_status` after each attempt, and only
+  reports `accepted: true` once the robot is operational on `/tf` and `/xform_world`. Subscribes
+  `/joint_states`, computes, publishes `/tf` at least 5 Hz via a timer task.
 - `src/robot_world_state_publisher.py` — subscribe `/tf` and `/global_pose`, compose, publish `/xform_world`.
 - `src/main.py` — wiring, starts the required three nodes plus gateway.
 
@@ -93,7 +96,8 @@ The `make demo` nodes (`joint_state_publisher`, `finite_state_machine`) come aft
    4x4 composition, with unit tests against hand-computed values.
 4. `urdf.py` parser with tests for direct-child rule, CRLF, comments, entity refs, joint types.
 5. `fk.py` tree build and composition with tests for fixed joints and a 2-link chain.
-6. `robot_state_publisher.py`: description validation, `/joint_states` subscription, `/tf` timer.
+6. `robot_state_publisher.py`: reload on higher `robot_description` version, validation, keep-previous on
+   rejection, description status, `/joint_states` subscription, `/tf` timer.
 7. `robot_world_state_publisher.py`: `/tf` and `/global_pose` → `/xform_world`.
 8. `main.py` wiring; `make run` readiness check within 10 s.
 9. Integration tests over the wire using `client_helper.py`.
