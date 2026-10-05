@@ -110,7 +110,7 @@ The `make demo` nodes (`joint_state_publisher`, `finite_state_machine`) come aft
 
 ## Open questions and assumptions
 
-Project 2 precedents are noted where they apply. Each is an assumption until the verbatim spec confirms it.
+Decided items cite the decision. Undecided items remain open.
 
 1. Verbatim spec (blocking for steps 2 and 7): the summary may differ on exact argument and response
    field names, error statuses, and the `/global_pose` format. Decided: service responses use the
@@ -118,16 +118,17 @@ Project 2 precedents are noted where they apply. Each is an assumption until the
 2. Who writes the FK math (decided): the user (project owner) hand-writes `urdf.py`, `transform.py`, and
    `fk.py`. Agents build the transport, node wiring, `param_server`, and tests around them, following
    Project 2's split. Agents must not write the URDF parsing or FK math.
-3. Advertise rule (decided): Project 2 and Project 3 rely on Project 1's advertisement rules. The gateway
-   gates external wire `publish` on an active advertisement, and an unadvertised publish is silently
-   dropped. Project 2's current gateway relaxes this, and its spec says so, so Project 2 needs to change
-   to match. Internal nodes publish in-process via `registry.publish`, which is not gated (Project 2 precedent).
+3. Advertise rule (decided): Project 2 and Project 3 rely on Project 1's advertisement rules. External
+   wire `publish` is dropped unless the connection holds an advertisement for that topic. The autograder
+   advertises before publishing (confirmed by the user). Project 2 was changed to match (`a34ffc8`).
+   Internal nodes publish in-process via `registry.publish`, which is not gated (Project 2 precedent).
 4. Node topology: assumed in-process on one asyncio loop, as in Projects 1 and 2 (Project 2 precedent).
+   Not yet confirmed.
 5. Quaternion convention (`w,x,y,z` vs `x,y,z,w`) in `/tf` and `/xform_world`: no precedent. Open.
 6. Message shapes: assumed ROS-style, matching Project 2: `header: {stamp: {sec, nanosec}, frame_id}`
    with parallel arrays for `/joint_states`. `/tf`, `/xform_world`, and `/global_pose` shapes: no
    precedent. Open.
-7. Stdlib only, no numpy (Project 2 precedent).
+7. Stdlib only, no numpy (Project 2 precedent). Not yet confirmed for Project 3.
 8. Startup probe risk: Project 2's grader probed a parameter service at startup, and a missing provider
    failed the whole run. Build `param_server` first (step 2) and check whether the probe calls
    `/param_server/get_param` or `set_param` with `{}`.
