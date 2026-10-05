@@ -115,9 +115,9 @@ Project 2 precedents are noted where they apply. Each is an assumption until the
 1. Verbatim spec (blocking for steps 2 and 7): the summary may differ on exact argument and response
    field names, error statuses, and the `/global_pose` format. Decided: service responses use the
    Project 1 envelope `{"values", "result", "status"}` (`service_response` on the wire, `id` echoed).
-2. Who writes the FK math: the summary says "no library" but not that the owner must write it. Project 2
-   split the work this way (owner writes physics/PID, agents write transport and wiring), so this plan
-   assumes the same split for `urdf.py`, `transform.py`, and `fk.py`. Confirm before implementation.
+2. Who writes the FK math (decided): the user (project owner) hand-writes `urdf.py`, `transform.py`, and
+   `fk.py`. Agents build the transport, node wiring, `param_server`, and tests around them, following
+   Project 2's split. Agents must not write the URDF parsing or FK math.
 3. Advertise rule (decided): Project 3 follows Project 1. The gateway gates external wire `publish` on an
    active advertisement, and an unadvertised publish is silently dropped. Project 2's relaxed rule does not
    apply. Internal nodes publish in-process via `registry.publish`, which is not gated (Project 2 precedent).
