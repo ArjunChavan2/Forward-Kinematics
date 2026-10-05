@@ -149,12 +149,9 @@ Decided items cite the decision. Undecided items remain open.
 6. Message shapes (decided by the fetched spec): `/joint_states`, `/tf`, `/xform_world`, and `/global_pose`
    follow the formats in the spec file. `/xform_world` matrices are 4x4 column-major.
 7. Stdlib only, no numpy (confirmed by the user for Project 3).
-8. Startup probe risk: Project 2's grader probed a parameter service at startup, and a missing provider
-   failed the whole run. Build `param_server` first (step 2) and check whether the probe calls
-   `/param_server/get_param` or `set_param` with `{}`.
-9. Description status topic (new from the fetched spec): `/robot_state_publisher/description_status`
-   reports `version`, `accepted`, `error`, `loaded_version`, `root_link`. Written only after the robot is
-   fully operational on `/tf` and `/xform_world`. Not in the plan's steps yet.
+8. Startup probe (deferred by the user): which service the grader calls with `{}` at startup, and the reply
+   it expects. Revisit before grading. Project 2's grader failed the whole run when a service was missing,
+   so every standard service must reply promptly to `{}`.
 
 ## Verification strategy
 
