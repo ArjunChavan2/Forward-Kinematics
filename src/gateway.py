@@ -39,16 +39,6 @@ class Connection:
     def __init__(self, writer: asyncio.StreamWriter) -> None:
         self._writer = writer
         self.advertised_services: set[str] = set()
-        # Topics this connection explicitly unadvertised: publishing there is
-        # dropped until it advertises again. A connection that never
-        # advertised may still publish (the protocol doesn't require it).
-        self.revoked_topics: set[str] = set()
-
-    def close(self) -> None:
-        try:
-            self._writer.close()
-        except Exception:
-            pass
 
     def send(self, message: dict) -> None:
         try:
@@ -56,6 +46,12 @@ class Connection:
             self._writer.write(line.encode("utf-8"))
         except (ConnectionError, RuntimeError):
             pass  # best-effort delivery; a dead peer is cleaned up by its read loop
+
+    def close(self) -> None:
+        try:
+            self._writer.close()
+        except Exception:
+            pass
 
 
 @dataclass
@@ -122,10 +118,7 @@ class Gateway:
         finally:
             self._connections.discard(conn)
             self._cleanup_connection(conn)
-            try:
-                writer.close()
-            except Exception:
-                pass
+            conn.close()
 
     def _cleanup_connection(self, conn: Connection) -> None:
         self.registry.remove_connection(conn)
@@ -143,10 +136,8 @@ class Gateway:
         try:
             if op == "advertise":
                 self.registry.advertise(conn, message["topic"])
-                conn.revoked_topics.discard(message["topic"])
             elif op == "unadvertise":
                 self.registry.unadvertise(conn, message["topic"])
-                conn.revoked_topics.add(message["topic"])
             elif op == "subscribe":
                 self.registry.subscribe(conn, message["topic"])
                 conn.send({"op": "status", "level": "info", "msg": f"subscribed to {message['topic']}", "id": req_id})
@@ -154,12 +145,12 @@ class Gateway:
                 self.registry.unsubscribe(conn, message["topic"])
             elif op == "publish":
                 topic = message["topic"]
-                # The protocol doesn't require advertise before publish, so a
-                # connection that never advertised may publish. An explicit
-                # unadvertise revokes publishing on that topic (silently
-                # dropped -- publish has no acknowledgement) until it
-                # advertises again.
-                if topic not in conn.revoked_topics:
+                # A connection may publish on a topic only while it currently
+                # holds an advertisement there; unadvertise immediately
+                # revokes it. Silently dropped, matching this project's other
+                # silent-reject cases (e.g. a malformed /map) -- publish has
+                # no acknowledgement in this protocol either way.
+                if self.registry.is_advertised(conn, topic):
                     self.registry.publish(topic, message.get("msg"))
             elif op == "advertise_service":
                 service = message["service"]

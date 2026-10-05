@@ -1,189 +1,118 @@
-# External rosbridge subset
+# Autorob TCP/JSON Rosbridge Protocol
 
-Version: 1.0
+## Overview
 
-This is the authoritative black-box grading protocol. It intentionally uses
-raw TCP rather than WebSockets and has no ROS installation dependency.
+This document defines the external [TCP](https://en.wikipedia.org/wiki/Transmission_Control_Protocol)/[JSON](https://www.json.org/json-en.html) client/server protocol into the course ROS-like publish/subscribe system. It does not prescribe how nodes communicate internally. Individual projects define the names and payloads carried by this protocol.
 
-## Transport and framing
+## Transport and common conventions
 
-The server must be reachable at `127.0.0.1:9095` and accepts concurrent TCP clients.
-Traffic is UTF-8. Each frame is exactly one JSON value serialized on one line
-and terminated by byte `0x0a` (`\n`). Senders escape newlines inside JSON
-strings. JSON objects are compared semantically: key order and insignificant
-whitespace do not matter.
+The gateway must be reachable at `127.0.0.1:9095` and accept multiple
+concurrent TCP clients. Traffic is UTF-8, with one JSON object per line,
+terminated by `\n`. JSON key order, insignificant whitespace, and unknown
+object fields are not semantic.
 
-Messages in this protocol are JSON objects. A blank line may be ignored. A
-malformed JSON line may be rejected or close the offending connection, but
-must not terminate the gateway or unrelated connections. Implementations may
-reject a line larger than 4 MiB.
+Every request has an `op` field. An optional `id` identifies a request;
+`call_service` requires one. IDs are opaque JSON values and must be unique
+among a client's outstanding operations. When the protocol returns an ID to
+the caller, it returns the caller's original value.
 
-Normal Project 1 inputs use non-empty topic and service names beginning with
-`/`; malformed or degenerate-name behavior is unspecified. Type names are
-informational strings. IDs are opaque JSON values, unique
-among a client's outstanding operations, and are echoed without rewriting.
-Unknown object fields are ignored for forward compatibility.
+Names identify topics and services by exact match. Individual projects may
+define naming conventions; behavior for malformed or empty names is
+unspecified. Type strings are informational metadata, not a runtime type
+system.
 
-## Topic operations
-
-### `advertise`
-
-Required: `op`, `topic`, `type`. Optional: `id`.
+The gateway uses diagnostic status objects:
 
 ```json
-{"op":"advertise","topic":"/map","type":"nav_msgs/OccupancyGrid","id":"a1"}
+{"op":"status","level":"info","msg":"subscribed to /topic","id":"sub-1"}
 ```
 
-It registers that connection as a publisher. Repeating the same advertisement
-is idempotent. No acknowledgement is required.
+`level` is `"info"` or `"error"`, and `msg` is a string. Include the ID when
+the triggering request supplied one. Clients may receive unrelated status or
+publication messages while waiting for a service response.
 
-### `unadvertise`
+## Topics
 
-Required: `op`, `topic`. Optional: `id`.
+| Operation | Required fields | Effect |
+| --- | --- | --- |
+| `advertise` | `op`, `topic`, `type` | Register this connection as a publisher. |
+| `unadvertise` | `op`, `topic` | Withdraw this connection's publisher registration. |
+| `publish` | `op`, `topic`, `msg` | Deliver `msg` to current subscribers of that exact topic. |
+| `subscribe` | `op`, `topic`, `type` | Register this connection as a subscriber. |
+| `unsubscribe` | `op`, `topic` | Withdraw this connection's subscription. |
+
+Examples:
 
 ```json
-{"op":"unadvertise","topic":"/map"}
+{"op":"advertise","topic":"/chatter","type":"example/Message","id":"pub-1"}
+{"op":"subscribe","topic":"/chatter","type":"example/Message","id":"sub-1"}
+{"op":"publish","topic":"/chatter","msg":{"data":"hello"}}
 ```
 
-It removes that connection's publisher. Repetition is harmless.
-
-### `publish`
-
-Required: `op`, `topic`, `msg`. Optional: `id`.
+A subscriber receives:
 
 ```json
 {"op":"publish","topic":"/chatter","msg":{"data":"hello"}}
 ```
 
-`msg` may be any JSON value. The gateway forwards the payload only to current
-matching subscribers. There is no history, latching, or replay.
+Send an informational `status` after a subscription is registered. Topic
+delivery is best-effort and nonpersistent: there is no latching, history, or
+replay. Different topic names remain isolated. Repeated unadvertise and
+unsubscribe operations must be safe. Project 1 does not otherwise rely on a
+particular behavior for redundant advertisement or subscription requests.
+Closing a connection withdraws only that connection's publishers and
+subscriptions.
 
-### `subscribe`
+## Services
 
-Required: `op`, `topic`, `type`. Optional: `id`.
+| Operation | Required fields | Effect |
+| --- | --- | --- |
+| `advertise_service` | `op`, `service`, `type` | Register this connection as a provider. |
+| `unadvertise_service` | `op`, `service` | Withdraw this connection's current provider registration. |
+| `call_service` | `op`, `service`, `id`, `args` | Call a named service. |
+| `service_response` | `op`, `service`, `id`, `values`, `result` | Respond to a forwarded call. |
 
-```json
-{"op":"subscribe","topic":"/path","type":"nav_msgs/Path","id":"s1"}
-```
-
-The gateway replies with an informational `status` after the subscription is
-registered. Each subsequent message arrives as:
-
-```json
-{"op":"publish","topic":"/path","msg":{}}
-```
-
-A client receives only topics it subscribed to. Repeating a subscription is
-idempotent.
-
-### `unsubscribe`
-
-Required: `op`, `topic`. Optional: `id`.
+`args` may be any JSON value. A provider receives a forwarded `call_service`
+with the same service and arguments but a provider-side ID. It responds using
+the received ID:
 
 ```json
-{"op":"unsubscribe","topic":"/path"}
+{"op":"service_response","service":"/echo","id":"provider-call-3","values":{"echo":"hello"},"result":true,"status":""}
 ```
 
-It removes that connection's subscription. Repetition is harmless.
-
-## Service operations
-
-### `advertise_service`
-
-Required: `op`, `service`, `type`. Optional: `id`.
+The gateway sends the caller a response with its original ID:
 
 ```json
-{"op":"advertise_service","service":"/echo","type":"example/Echo","id":"p1"}
+{"op":"service_response","service":"/echo","id":"call-17","values":{"echo":"hello"},"result":true,"status":""}
 ```
 
-The connection becomes the service provider. The gateway replies with an
-informational `status` once registration completes. The reference middleware
-supports one current provider per service name; a newer registration replaces
-the discovery entry for future calls.
+Individual projects define the structure and types of `values` and `result`.
+`status`, when present, is a diagnostic string. Send an informational `status`
+after a service registration completes.
 
-### `unadvertise_service`
+One current provider per service name is sufficient. The policy for competing
+simultaneous provider registrations is implementation-defined, but a future
+call must never be routed to a provider that has withdrawn or disconnected.
+`unadvertise_service` removes a service only when the sender is its current
+provider. Connection close removes services owned by that connection.
 
-Required: `op`, `service`. Optional: `id`.
+Calls are correlated by connection and ID. Concurrent calls must not be
+cross-correlated. A missing provider, provider disconnect, or timeout must
+return a clean `result:false` response with the original caller ID. Timeout
+duration is implementation-defined but must be bounded; a call must not wait
+indefinitely. A `service_response` is valid only for an outstanding
+provider-side call on that connection. Unknown or stale response IDs may be
+ignored or receive an error status, but must never complete another caller's
+request.
 
-```json
-{"op":"unadvertise_service","service":"/echo"}
-```
+## Errors, cleanup, and implementation freedom
 
-It removes the service only when this connection is its current provider.
+Unknown operations produce an error status. Malformed requests may be rejected
+or may close the offending connection, but they must not terminate the gateway
+or unrelated connections. Detailed malformed-request behavior, including
+missing fields and malformed application payloads, is otherwise unspecified.
 
-### `call_service`
-
-Required: `op`, `service`, `id`, `args`.
-
-```json
-{
-  "op":"call_service",
-  "service":"/plan_path",
-  "id":"grader-42",
-  "args":{"start":{},"goal":{},"tolerance":0.0}
-}
-```
-
-At the generic transport layer `args` is any JSON value. Named argument
-objects are canonical; Project 1 APIs define their own accepted forms. A
-provided external service receives a forwarded call with the same shape but
-with a gateway-generated provider-side ID. It responds with:
-
-```json
-{
-  "op":"service_response",
-  "service":"/echo",
-  "id":"provider_call_7",
-  "values":{"echo":"value"},
-  "result":true,
-  "status":""
-}
-```
-
-The gateway returns a response to the original caller, restoring the caller's
-ID:
-
-```json
-{
-  "op":"service_response",
-  "service":"/echo",
-  "id":"grader-42",
-  "values":{"echo":"value"},
-  "result":true,
-  "status":""
-}
-```
-
-Project 1-owned services use object `values`, Boolean `result`, and string
-`status`; the generic gateway need not type-check arbitrary external provider
-responses. A missing provider, timeout, or provider disconnect fails cleanly
-with the original ID and `result:false`. Calls are correlated by both
-connection and ID; unrelated publish or
-status traffic may arrive before the response.
-
-### `service_response`
-
-Required: `op`, `service`, `id`, `values`, `result`. Optional: `status`.
-It is valid only for an outstanding provider-side call on that connection.
-Unknown or stale IDs produce an error status or are ignored; they must never
-complete another caller's request.
-
-## Status messages
-
-Gateway-generated status messages have this form:
-
-```json
-{"op":"status","level":"info","msg":"subscribed to /path","id":"s1"}
-```
-
-`level` is `"info"` or `"error"`; `msg` is a diagnostic string; `id` is
-included and echoed when the triggering request supplied one. Unknown `op`
-values and invalid required fields produce an error status. Errors are scoped
-to the offending connection and do not crash the gateway.
-
-## Connection lifecycle
-
-Closing an external connection withdraws all publishers, subscribers, and
-services owned by it. Delivery is best-effort and non-persistent. Different
-clients may send and receive concurrently; one slow client must not prevent
-unrelated clients from making progress within grader deadlines.
+The protocol does not prescribe internal topology, process count, concurrency
+strategy, message queues, timeout value, or implementation language. A slow
+client must not prevent unrelated clients from making progress. All
+registrations are owned by their connection and are cleaned up on disconnect.

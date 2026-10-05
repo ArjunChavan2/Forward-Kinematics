@@ -1,9 +1,8 @@
 # Project 3 — Forward Kinematics
 
-Python implementation of forward kinematics for a planar n-link rotational arm, served over the
-rosbridge-style TCP/JSON gateway from Project 1 (`127.0.0.1:9095`), with the transport reused from
-`~/Pendularm` (`src/registry.py`, `src/gateway.py`). Spec: `spec/ROSBRIDGE_PROTOCOL.md`.
-The Project 3 spec (`spec/PROJECT3_FORWARD_KINEMATICS.md`) is not yet in this repo.
+Python implementation of URDF-driven forward kinematics and a multi-node pub/sub system, running on
+the Project 1 rosbridge-style TCP/JSON gateway (`127.0.0.1:9095`). Spec:
+`spec/PROJECT3_FORWARD_KINEMATICS.md` (summary; verbatim spec pending), `spec/ROSBRIDGE_PROTOCOL.md`.
 
 ## Running
 
@@ -16,9 +15,17 @@ make clean   # removes __pycache__
 
 ## Layout
 
-- `src/registry.py`, `src/gateway.py` — generic topic/service registry and asyncio TCP/JSON gateway, ported from Project 2.
-- `src/main.py` — wires `Registry` + `Gateway`; `make run`'s entry point.
+- `src/registry.py`, `src/gateway.py` — generic topic/service registry and asyncio TCP/JSON gateway, from Project 1.
+- `src/main.py` — wires `Registry` + `Gateway`; `make run`'s entry point. No Project 3 nodes yet.
 - `tests/client_helper.py` — raw-socket TCP/JSON test client.
-- `spec/` — protocol reference and submission packaging notes.
+- `prompts/` — Plan/Implement/Audit/Test agent instructions, reused across sessions.
+- `agent-notes/` — handoff artifacts (`PLAN.md`, `IMPLEMENTATION.md`, `AUDIT.md`, `TEST_RESULTS.md`) written by each phase.
+- `spec/` — project spec summary, protocol reference, submission packaging notes.
 
-Not yet built: the forward-kinematics module and its services.
+## Workflow
+
+Plan → Implement → Audit → Test, one phase per session, each reading `prompts/<PHASE>.md` and the
+prior phase's `agent-notes/` file. See each prompt's "Project context" section for current status.
+
+Not yet built: URDF parsing, FK math, `param_server`, `robot_state_publisher`,
+`robot_world_state_publisher`, and `make demo`.
