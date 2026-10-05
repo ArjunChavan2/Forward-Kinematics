@@ -64,7 +64,10 @@ subscriptions on the registry:
 - `src/param_server.py` — in-memory dict; `set_param`/`get_param` services.
 - `src/urdf.py` — XML parsing into a model of links and joints (direct `<robot>` children only).
   Parser choice is open (see questions). Pure data, no ROS types.
-- `src/transform.py` — hand-written 3x3/4x4 matrix or quaternion helpers, RPY, axis-angle, normalize.
+- `src/transform.py` — hand-written (owner). Build in this order: (1) unit quaternion from axis and angle,
+  `q = (cos(θ/2), sin(θ/2)·axis)` with the axis normalized; (2) quaternion to rotation matrix; (3) rotation
+  matrix to quaternion (the reverse, with sign handling); (4) RPY to rotation; (5) 4x4 transform from
+  translation and rotation. Everything uses the `(a, b, c, d)` = `(w, x, y, z)` convention from the plan.
 - `src/fk.py` — kinematic tree build (root link, parent/child map), traversal, `T_root_child`
   composition from `q`, quaternion output.
 - `src/robot_state_publisher.py` — on `robot_description` set, parse and validate, store model;
@@ -86,7 +89,8 @@ The `make demo` nodes (`joint_state_publisher`, `finite_state_machine`) come aft
 
 1. Get the verbatim spec and fill the open questions below.
 2. `param_server.py` with `set_param`/`get_param`, plus a unit test.
-3. `transform.py` with unit tests against hand-computed values.
+3. `transform.py` (owner-written): axis-angle to quaternion, quaternion to matrix, matrix to quaternion, RPY,
+   4x4 composition, with unit tests against hand-computed values.
 4. `urdf.py` parser with tests for direct-child rule, CRLF, comments, entity refs, joint types.
 5. `fk.py` tree build and composition with tests for fixed joints and a 2-link chain.
 6. `robot_state_publisher.py`: description validation, `/joint_states` subscription, `/tf` timer.
