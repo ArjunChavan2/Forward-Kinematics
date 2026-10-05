@@ -112,9 +112,9 @@ The `make demo` nodes (`joint_state_publisher`, `finite_state_machine`) come aft
 
 Decided items cite the decision. Undecided items remain open.
 
-1. Verbatim spec (blocking for steps 2 and 7): the summary may differ on exact argument and response
-   field names, error statuses, and the `/global_pose` format. Decided: service responses use the
-   Project 1 envelope `{"values", "result", "status"}` (`service_response` on the wire, `id` echoed).
+1. Verbatim spec: `spec/PROJECT3_FORWARD_KINEMATICS.md` now holds the message formats, fetched from
+   autorob.org. Still to check: the fetch tool may paraphrase, so confirm field names and numbers against
+   the official page. Decided: service responses use the Project 1 envelope `{"values", "result", "status"}`.
 2. Who writes the FK math (decided): the user (project owner) hand-writes `urdf.py`, `transform.py`, and
    `fk.py`. Agents build the transport, node wiring, `param_server`, and tests around them, following
    Project 2's split. Agents must not write the URDF parsing or FK math.
@@ -124,14 +124,17 @@ Decided items cite the decision. Undecided items remain open.
    Internal nodes publish in-process via `registry.publish`, which is not gated (Project 2 precedent).
 4. Node topology: assumed in-process on one asyncio loop, as in Projects 1 and 2 (Project 2 precedent).
    Not yet confirmed.
-5. Quaternion convention (`w,x,y,z` vs `x,y,z,w`) in `/tf` and `/xform_world`: no precedent. Open.
-6. Message shapes: assumed ROS-style, matching Project 2: `header: {stamp: {sec, nanosec}, frame_id}`
-   with parallel arrays for `/joint_states`. `/tf`, `/xform_world`, and `/global_pose` shapes: no
-   precedent. Open.
+5. Quaternion convention (decided by the fetched spec): `(x, y, z, w)` with `w` scalar in `/tf`,
+   `/xform_world`, and `/global_pose`.
+6. Message shapes (decided by the fetched spec): `/joint_states`, `/tf`, `/xform_world`, and `/global_pose`
+   follow the formats in the spec file. `/xform_world` matrices are 4x4 column-major.
 7. Stdlib only, no numpy (Project 2 precedent). Not yet confirmed for Project 3.
 8. Startup probe risk: Project 2's grader probed a parameter service at startup, and a missing provider
    failed the whole run. Build `param_server` first (step 2) and check whether the probe calls
    `/param_server/get_param` or `set_param` with `{}`.
+9. Description status topic (new from the fetched spec): `/robot_state_publisher/description_status`
+   reports `version`, `accepted`, `error`, `loaded_version`, `root_link`. Written only after the robot is
+   fully operational on `/tf` and `/xform_world`. Not in the plan's steps yet.
 
 ## Verification strategy
 
