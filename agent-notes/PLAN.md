@@ -81,7 +81,8 @@ subscriptions on the registry:
   - Joint type is one of `revolute`, `continuous`, `prismatic`, `fixed`.
   - Revolute and prismatic joints must have a `<limit>`, and a missing one rejects the description. The limit
     values themselves are informational.
-  - Revolute and continuous axes are non-zero, so they can be normalized.
+  - Revolute, continuous, and prismatic axes must be non-zero. A zero axis rejects the description (the spec
+    leaves this unspecified). Fixed joints are exempt, so `0 0 0` on a fixed joint still loads.
   - Limits are validated only as the spec requires: a revolute or prismatic joint must have `<limit>`, and a
     present `lower`/`upper` must be a number. No `lower <= upper` rule is in the spec.
   - FK never clamps to limits (the spec says limits are informational). `joint_state_publisher` (demo only)
