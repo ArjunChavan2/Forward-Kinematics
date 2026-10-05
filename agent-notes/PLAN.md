@@ -113,8 +113,8 @@ The `make demo` nodes (`joint_state_publisher`, `finite_state_machine`) come aft
 Project 2 precedents are noted where they apply. Each is an assumption until the verbatim spec confirms it.
 
 1. Verbatim spec (blocking for steps 2 and 7): the summary may differ on exact argument and response
-   field names, error statuses, and the `/global_pose` format. Assumed: service responses use the
-   Project 1 envelope `{"values", "result", "status"}`, as in Project 2.
+   field names, error statuses, and the `/global_pose` format. Decided: service responses use the
+   Project 1 envelope `{"values", "result", "status"}` (`service_response` on the wire, `id` echoed).
 2. Who writes the FK math: the summary says "no library" but not that the owner must write it. Project 2
    split the work this way (owner writes physics/PID, agents write transport and wiring), so this plan
    assumes the same split for `urdf.py`, `transform.py`, and `fk.py`. Confirm before implementation.
