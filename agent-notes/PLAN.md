@@ -110,17 +110,27 @@ The `make demo` nodes (`joint_state_publisher`, `finite_state_machine`) come aft
 
 ## Open questions and assumptions
 
-1. Verbatim spec: the summary may differ on exact arg/response shapes, error statuses, and the
-   `/global_pose` message format. Blocking for steps 2 and 7.
-2. Who writes the FK math. The summary says "do not use a library" but not that the owner must
-   hand-write it. The workflow prompts currently assume the owner writes `urdf.py`/`transform.py`/`fk.py`
-   and agents build around them. Confirm before implementation, or drop that split.
-3. Protocol: the summary says reuse the Project 1 middleware. Confirm the Project 1 rules (advertise
-   before publish) apply to `/tf` and `/xform_world`.
-4. Node topology: in-process (like Projects 1 and 2) or separate TCP clients. The summary does not say.
-5. Quaternion convention (`w,x,y,z` vs `x,y,z,w`) in `/tf` and `/xform_world`. Not in the summary.
-6. Message shapes for `/tf`, `/xform_world`, `/joint_states`, `/global_pose`. Not in the summary.
-7. Assumed: Python 3 standard library only. No numpy.
+Project 2 precedents are noted where they apply. Each is an assumption until the verbatim spec confirms it.
+
+1. Verbatim spec (blocking for steps 2 and 7): the summary may differ on exact argument and response
+   field names, error statuses, and the `/global_pose` format. Assumed: service responses use the
+   Project 1 envelope `{"values", "result", "status"}`, as in Project 2.
+2. Who writes the FK math: the summary says "no library" but not that the owner must write it. Project 2
+   split the work this way (owner writes physics/PID, agents write transport and wiring), so this plan
+   assumes the same split for `urdf.py`, `transform.py`, and `fk.py`. Confirm before implementation.
+3. Advertise rule: Project 1 gates external wire `publish` on an advertisement; Project 2 does not.
+   Project 3 follows Project 1 (reuse the gateway). Confirm whether a grader publishing `/joint_states`
+   over the wire will advertise first. Internal nodes publish in-process via `registry.publish`, which is
+   not gated (Project 2 precedent).
+4. Node topology: assumed in-process on one asyncio loop, as in Projects 1 and 2 (Project 2 precedent).
+5. Quaternion convention (`w,x,y,z` vs `x,y,z,w`) in `/tf` and `/xform_world`: no precedent. Open.
+6. Message shapes: assumed ROS-style, matching Project 2: `header: {stamp: {sec, nanosec}, frame_id}`
+   with parallel arrays for `/joint_states`. `/tf`, `/xform_world`, and `/global_pose` shapes: no
+   precedent. Open.
+7. Stdlib only, no numpy (Project 2 precedent).
+8. Startup probe risk: Project 2's grader probed a parameter service at startup, and a missing provider
+   failed the whole run. Build `param_server` first (step 2) and check whether the probe calls
+   `/param_server/get_param` or `set_param` with `{}`.
 
 ## Verification strategy
 
