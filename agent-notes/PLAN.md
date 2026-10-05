@@ -82,6 +82,11 @@ subscriptions on the registry:
   - Revolute and prismatic joints have a `<limit>`. Missing limits are a warning, not a rejection,
     since the spec says limits are informational.
   - Revolute and continuous axes are non-zero, so they can be normalized.
+  - Limits are validated at load time: `lower <= upper`, and `velocity` and `effort` are non-negative when
+    present. Invalid limits reject the description.
+  - FK never clamps to limits (the spec says limits are informational). `joint_state_publisher` (demo only)
+    clamps its servo setpoints to limits so the choreography respects them.
+  - Effort limits are validated only. The spec defines no effort enforcement.
   Subscribes `/joint_states`, computes, publishes `/tf` at least 5 Hz via a timer task.
 - `src/robot_world_state_publisher.py` — subscribe `/tf` and `/global_pose`, compose, publish `/xform_world`.
 - `src/main.py` — wiring, starts the required three nodes plus gateway.
