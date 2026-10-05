@@ -79,11 +79,11 @@ subscriptions on the registry:
   - Every joint's parent and child name an existing link. No duplicate link or joint names.
   - Exactly one root link, and the joints form a tree with no loops.
   - Joint type is one of `revolute`, `continuous`, `prismatic`, `fixed`.
-  - Revolute and prismatic joints have a `<limit>`. Missing limits are a warning, not a rejection,
-    since the spec says limits are informational.
+  - Revolute and prismatic joints must have a `<limit>`, and a missing one rejects the description. The limit
+    values themselves are informational.
   - Revolute and continuous axes are non-zero, so they can be normalized.
-  - Limits are validated at load time: `lower <= upper`, and `velocity` and `effort` are non-negative when
-    present. Invalid limits reject the description.
+  - Limits are validated only as the spec requires: a revolute or prismatic joint must have `<limit>`, and a
+    present `lower`/`upper` must be a number. No `lower <= upper` rule is in the spec.
   - FK never clamps to limits (the spec says limits are informational). `joint_state_publisher` (demo only)
     clamps its servo setpoints to limits so the choreography respects them.
   - Effort limits are validated only. The spec defines no effort enforcement.

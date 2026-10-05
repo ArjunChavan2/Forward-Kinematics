@@ -162,3 +162,45 @@ See `spec/submission_layout.md`.
 
 Video of an FSM choreography from `make demo`, with a self-built viewer that draws each link from `/xform_world`.
 A portfolio page describes the robot, the choreography, and the viewer. Due date TBD on the page.
+
+## Additions from the linked specs (FK_API and ROBOT_DESCRIPTION)
+
+Summarized from the two linked pages, which are the authoritative contract when they disagree with the handout.
+
+Description validity (must reject):
+- Value is not a JSON string, is empty or whitespace-only, or is not well-formed XML; or the root is not `<robot>`.
+- No direct-child `<link>`. A link without `name`. A joint without `name` or `type`, or without `<parent>` or `<child>` naming a link.
+- Joint type outside `revolute`, `continuous`, `prismatic`, `fixed` (case-sensitive; `floating` and `planar` rejected).
+- Joint parent or child not a link of the robot.
+- Not exactly one root (zero roots or two or more links that are no joint's child).
+- Revolute or prismatic joint with no `<limit>`, or a present `lower`/`upper` that is not a number. A missing `lower`/`upper` means 0.
+- A vector attribute (origin xyz/rpy, axis xyz, visual vectors) without exactly three numbers, or a number that is not a finite decimal literal.
+- First `<visual>` with an invalid geometry (box, cylinder, sphere, mesh are the valid shapes; anything else or empty geometry is rejected).
+
+Not rejected, even if odd:
+- `<limit>` on continuous or fixed joints (ignored entirely, even if malformed).
+- `axis` on fixed joints, including `0 0 0`.
+- Missing `<origin>`, `xyz`, or `rpy` (zeros); missing `<axis>` or `xyz` (1 0 0); missing `name` on `<robot>`.
+- Unknown elements and attributes, `<collision>`, `<inertial>`, `<gazebo>`, `<transmission>`, `<mimic>`, and links with no `<visual>`.
+- Nested `<link>` or `<joint>` anywhere but a direct child of `<robot>` (ignored, not rejected).
+
+UNSPECIFIED (do not crash or hang): duplicate names; parent equal to child; a link that is two joints' child; a cycle; a zero or non-finite axis on a movable joint; non-finite numbers; more than one of a child element in a joint; empty names.
+
+Numbers: a finite decimal literal with optional sign, decimal point and exponent is accepted. Underflow is 0. Hex floats, nan, inf, and overflow are UNSPECIFIED.
+
+XML: leading whitespace, declarations, processing instructions, comments (even with markup inside), namespace declarations on `<robot>`, single or double quotes, predefined and numeric character references, CDATA, self-closing tags, CRLF, and joints before links all must load. A byte-order mark, `<!DOCTYPE>`, an undeclared prefix, or a non-predefined entity is UNSPECIFIED.
+
+Size: the runtime must accept a description whose request line and its get_param reply are each up to 1 MiB.
+
+Node behavior (FK_API):
+- robot_state_publisher polls `get_param` for `robot_description` and processes each new version (it may skip intermediate versions, and must process the latest). It sets `/robot_state_publisher/description_status` for a version at least V within 2 s of a set that returned V.
+- Invalid description: the previous robot stays, unchanged, and the node keeps running.
+- `/joint_states`: unknown or fixed names ignored; unnamed movable joints at 0; positions used exactly, no clamping.
+- `/tf`: publish at least 5 Hz while a robot is loaded, never while none is loaded. One entry per joint including fixed, parent-to-child, `T_joint(q)`. No entry for the root.
+- `/xform_world`: compute from the latest `/tf` alone. One entry per link including the root. An optional identity entry with child `global_frame` may appear. Fixed frame defaults to `global_frame`.
+- `/global_pose`: identity until the first message, then the latest. Extra fields ignored.
+- A robot with no joints has an unspecified `/xform_world`.
+
+Recommended nodes (not graded): `joint_state_publisher` keeps setpoints by joint name, including names the loaded robot does not have yet, and applies them after a robot with those joints loads. `finite_state_machine` document format, services, and `/fsm/status` are in FK_API. Saved files use identifiers matching `[A-Za-z0-9_-]{1,64}`.
+
+Out of scope: xacro expansion, mimic behavior, floating and planar joints, `<gazebo>` and `<transmission>` content, mesh loading, JRDF, multiple robots.
