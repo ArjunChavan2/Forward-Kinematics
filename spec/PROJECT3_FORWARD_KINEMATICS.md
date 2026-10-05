@@ -1,7 +1,126 @@
-# Project 3 — Forward Kinematics (summary)
+# Project 3 — Forward Kinematics
 
-Source: https://autorob.org/projects/project3/#starter-projects. This is a summary, not the verbatim
-spec. Replace it with the official text before relying on exact wording or numbers.
+Source: https://autorob.org/projects/project3/
+
+Fetched through a tool that reproduces the page's text. Check exact field names and numbers against
+the official page before relying on them, since the fetch tool may paraphrase.
+
+## Parameter server
+
+### `/param_server/set_param`
+
+Request: `{"name": "<name>", "value": <any JSON>}`
+
+Response: `{"values": {"version": <n>}, "result": <bool>, "status": <string>}`
+
+Each name keeps its own version, starting at 0. The first `set_param` makes it 1. A missing or
+non-string name gets `result: false` with a descriptive status.
+
+### `/param_server/get_param`
+
+Request: `{"name": "<name>"}`
+
+Response: `{"values": {"value": <stored value>, "version": <n>}, "result": <bool>, "status": <string>}`
+
+For an unset name: `result: false`, `value: null`, `version: 0`.
+
+## Robot state publisher status
+
+Published on `/robot_state_publisher/description_status`:
+
+```json
+{"version": 7, "accepted": true, "error": "", "loaded_version": 7, "root_link": "base_link"}
+```
+
+- `version`: the processed `robot_description` version.
+- `accepted`: true when the load succeeded.
+- `error`: empty if accepted, otherwise a non-empty reason.
+- `loaded_version`, `root_link`: describe the active robot.
+
+Write status only after the robot is fully operational on `/tf` and `/xform_world`.
+
+## `/joint_states` (subscribe)
+
+`sensor_msgs/JointState`:
+
+```json
+{"header": {"stamp": {"sec": 0, "nanosec": 0}, "frame_id": ""},
+ "name": [...], "position": [...], "velocity": [...], "effort": [...]}
+```
+
+Each message replaces the joint state. Unnamed movable joints default to position 0. Unknown names and
+fixed joints are ignored. `header.stamp` is copied verbatim to `/tf` entries.
+
+## `/tf` (publish)
+
+`geometry_msgs/TransformStamped` array:
+
+```json
+{"transforms": [
+  {"header": {"stamp": {"sec": 0, "nanosec": 0}, "frame_id": "<parent link>"},
+   "child_frame_id": "<child link>",
+   "transform": {"translation": {"x": 0.0, "y": 0.0, "z": 0.0},
+                 "rotation": {"x": 0.0, "y": 0.0, "z": 0.0, "w": 1.0}}}
+]}
+```
+
+- At least 5 Hz.
+- Exactly one entry per joint, including fixed joints.
+- All entries share one stamp.
+- A late subscriber gets a complete current message within one publishing cycle.
+
+## `/xform_world` (publish)
+
+Array of matrix transforms:
+
+```json
+{"transforms": [
+  {"header": {"stamp": {"sec": 0, "nanosec": 0}, "frame_id": "global_frame"},
+   "child_frame_id": "<link name>",
+   "matrix": [m00, m10, m20, m30, m01, m11, m21, m31, m02, m12, m22, m32, m03, m13, m23, m33]}
+]}
+```
+
+- `matrix` is a 4x4 in column-major order. Translation is `matrix[12..14]`.
+- Include every link, including the root.
+- Compute from the latest `/tf` message alone. Do not merge old edges.
+- At least 5 Hz.
+
+## `/global_pose` (subscribe)
+
+`geometry_msgs/Pose`:
+
+```json
+{"position": {"x": 0.0, "y": 0.0, "z": 0.0}, "orientation": {"x": 0.0, "y": 0.0, "z": 0.0, "w": 1.0}}
+```
+
+The root link's pose in `global_frame`. Identity until the first message arrives.
+
+## Math conventions
+
+- RPY: `R = Rz(yaw) · Ry(pitch) · Rx(roll)`.
+- `T_joint(q) = T_origin · T_motion(q)`, with `T_origin = Trans(xyz) · Rot(rpy)` in the parent frame.
+- Revolute and continuous: rotate by `q` about the normalized `axis`.
+- Prismatic: translate by `q · axis`. The axis is not normalized.
+- Fixed: identity.
+- Quaternions are `(x, y, z, w)` with `w` scalar.
+
+## Accuracy
+
+- Translations within 1e-4 m.
+- Rotations within 1e-4 rad (angle between matrices).
+- Quaternion norm within 1e-4 of 1.
+- `/xform_world` rotation blocks orthonormal within 1e-4, determinant +1.
+- All numeric fields are JSON numbers.
+
+## Errors
+
+Invalid service names or missing required fields get `result: false` and a non-empty `status`.
+A rejected robot description leaves the previous robot unchanged, and `/tf` and `/xform_world` are
+unaffected.
+
+
+## Summary (earlier, pre-verbatim)
 
 ## Goals
 
