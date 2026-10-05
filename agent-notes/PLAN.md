@@ -122,13 +122,12 @@ Decided items cite the decision. Undecided items remain open.
    wire `publish` is dropped unless the connection holds an advertisement for that topic. The autograder
    advertises before publishing (confirmed by the user). Project 2 was changed to match (`a34ffc8`).
    Internal nodes publish in-process via `registry.publish`, which is not gated (Project 2 precedent).
-4. Node topology: assumed in-process on one asyncio loop, as in Projects 1 and 2 (Project 2 precedent).
-   Not yet confirmed.
+4. Node topology (confirmed by the user): in-process on one asyncio loop, as in Projects 1 and 2.
 5. Quaternion convention (decided): `q = a + bi + cj + dk`, with `a` the scalar part. In JSON the order is
    `(x, y, z, w)`, so `x = b`, `y = c`, `z = d`, `w = a`. Applies to `/tf`, `/xform_world`, and `/global_pose`.
 6. Message shapes (decided by the fetched spec): `/joint_states`, `/tf`, `/xform_world`, and `/global_pose`
    follow the formats in the spec file. `/xform_world` matrices are 4x4 column-major.
-7. Stdlib only, no numpy (Project 2 precedent). Not yet confirmed for Project 3.
+7. Stdlib only, no numpy (confirmed by the user for Project 3).
 8. Startup probe risk: Project 2's grader probed a parameter service at startup, and a missing provider
    failed the whole run. Build `param_server` first (step 2) and check whether the probe calls
    `/param_server/get_param` or `set_param` with `{}`.
