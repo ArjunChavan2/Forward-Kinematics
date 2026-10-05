@@ -124,8 +124,8 @@ Decided items cite the decision. Undecided items remain open.
    Internal nodes publish in-process via `registry.publish`, which is not gated (Project 2 precedent).
 4. Node topology: assumed in-process on one asyncio loop, as in Projects 1 and 2 (Project 2 precedent).
    Not yet confirmed.
-5. Quaternion convention (decided by the fetched spec): `(x, y, z, w)` with `w` scalar in `/tf`,
-   `/xform_world`, and `/global_pose`.
+5. Quaternion convention (decided): `q = a + bi + cj + dk`, with `a` the scalar part. In JSON the order is
+   `(x, y, z, w)`, so `x = b`, `y = c`, `z = d`, `w = a`. Applies to `/tf`, `/xform_world`, and `/global_pose`.
 6. Message shapes (decided by the fetched spec): `/joint_states`, `/tf`, `/xform_world`, and `/global_pose`
    follow the formats in the spec file. `/xform_world` matrices are 4x4 column-major.
 7. Stdlib only, no numpy (Project 2 precedent). Not yet confirmed for Project 3.
