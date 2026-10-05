@@ -73,8 +73,16 @@ subscriptions on the registry:
 - `src/robot_state_publisher.py` — reloads whenever `robot_description` reaches a higher version than the
   one loaded. Parses and validates the new description. If it is rejected, keeps the previous robot and
   `/tf` unchanged. Publishes `/robot_state_publisher/description_status` after each attempt, and only
-  reports `accepted: true` once the robot is operational on `/tf` and `/xform_world`. Subscribes
-  `/joint_states`, computes, publishes `/tf` at least 5 Hz via a timer task.
+  reports `accepted: true` once the robot is operational on `/tf` and `/xform_world`.
+  Validation checks, each failure sets `accepted: false` with a specific non-empty `error`:
+  - XML is well-formed, and the root element is `<robot>`.
+  - Every joint's parent and child name an existing link. No duplicate link or joint names.
+  - Exactly one root link, and the joints form a tree with no loops.
+  - Joint type is one of `revolute`, `continuous`, `prismatic`, `fixed`.
+  - Revolute and prismatic joints have a `<limit>`. Missing limits are a warning, not a rejection,
+    since the spec says limits are informational.
+  - Revolute and continuous axes are non-zero, so they can be normalized.
+  Subscribes `/joint_states`, computes, publishes `/tf` at least 5 Hz via a timer task.
 - `src/robot_world_state_publisher.py` — subscribe `/tf` and `/global_pose`, compose, publish `/xform_world`.
 - `src/main.py` — wiring, starts the required three nodes plus gateway.
 
