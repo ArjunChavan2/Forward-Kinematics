@@ -58,9 +58,17 @@ PAGE_TEMPLATE = """<!doctype html>
   <h1>{title}</h1>
   <div class="note">zero-configuration FK, demo_fk.py (temporary, not src/fk.py) &mdash; drag to orbit, scroll to zoom</div>
 </div>
-<script src="https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.149.0/examples/js/controls/OrbitControls.js"></script>
-<script>
+<script type="importmap">
+{{
+  "imports": {{
+    "three": "https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.module.js"
+  }}
+}}
+</script>
+<script type="module">
+import * as THREE from "three";
+import {{ OrbitControls }} from "https://cdn.jsdelivr.net/npm/three@0.149.0/examples/jsm/controls/OrbitControls.js";
+
 const data = {data_json};
 
 const scene = new THREE.Scene();
@@ -112,7 +120,7 @@ for (const p of Object.values(positions)) {{
 camera.position.set(maxDist * 1.5, maxDist * 1.2, maxDist * 1.5);
 camera.lookAt(0, 0, 0);
 
-const controls = new THREE.OrbitControls(camera, renderer.domElement);
+const controls = new OrbitControls(camera, renderer.domElement);
 controls.target.set(0, 0, 0);
 
 window.addEventListener("resize", () => {{
