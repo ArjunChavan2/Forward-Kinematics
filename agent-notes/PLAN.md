@@ -105,15 +105,20 @@ The `make demo` nodes (`joint_state_publisher`, `finite_state_machine`) come aft
 ## Implementation steps
 
 1. Get the verbatim spec and fill the open questions below.
-2. `param_server.py` with `set_param`/`get_param`, plus a unit test.
+2. `param_server.py` with `set_param`/`get_param`, plus a unit test. DONE.
 3. `transform.py` (owner-written): axis-angle to quaternion, quaternion to matrix, matrix to quaternion, RPY,
-   4x4 composition, with unit tests against hand-computed values.
-4. `urdf.py` parser with tests for direct-child rule, CRLF, comments, entity refs, joint types.
-5. `fk.py` tree build and composition with tests for fixed joints and a 2-link chain.
+   4x4 composition, with unit tests against hand-computed values. DONE.
+4. `urdf.py` parser with tests for direct-child rule, CRLF, comments, entity refs, joint types. DONE.
+5. `fk.py` tree build and composition with tests for fixed joints and a 2-link chain. NOT DONE (owner-written,
+   blocking step). `tools/demo_fk.py` is a throwaway, non-graded stand-in with the same contract, used only to
+   verify steps 6-8's wiring.
 6. `robot_state_publisher.py`: reload on higher `robot_description` version, validation, keep-previous on
-   rejection, description status, `/joint_states` subscription, `/tf` timer.
-7. `robot_world_state_publisher.py`: `/tf` and `/global_pose` → `/xform_world`.
-8. `main.py` wiring; `make run` readiness check within 10 s.
+   rejection, description status, `/joint_states` subscription, `/tf` timer. DONE, wiring verified against a
+   throwaway fk adapter; will produce real `/tf` once `fk.py` (step 5) is written.
+7. `robot_world_state_publisher.py`: `/tf` and `/global_pose` → `/xform_world`. DONE (reuses
+   `fk.root_of_edges`/`fk.link_transforms`, no FK math of its own), same caveat as step 6.
+8. `main.py` wiring. DONE. Readiness-within-10s not yet checked against a real robot, since that needs
+   step 5.
 9. Integration tests over the wire using `client_helper.py`.
 10. `joint_state_publisher.py` (ungraded, `make demo` only): reads `robot_description`, subscribes
     `/joint_trajectory`, keeps setpoints by joint name (including names not yet loaded), servos joints toward
