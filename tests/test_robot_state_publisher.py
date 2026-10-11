@@ -12,6 +12,7 @@ from robot_state_publisher import DESCRIPTION_PARAM, STATUS_PARAM, RobotStatePub
 class _Robot:
     def __init__(self, root_link: str) -> None:
         self.root_link = root_link
+        self.joints = []
 
 
 def _loader(text: str) -> _Robot:
