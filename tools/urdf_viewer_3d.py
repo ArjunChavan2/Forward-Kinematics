@@ -1,8 +1,7 @@
-"""Local 3D web viewer: parse a URDF, compute poses with the TEMPORARY tools/demo_fk.py, and
+"""Local 3D web viewer: parse a URDF, compute zero-configuration poses with src/fk.py, and
 render the robot's links/joints with three.js.
 
-Not part of the graded submission. Poses come from demo_fk.py, not src/fk.py (which the owner
-will write themselves) -- replace the import below once that exists.
+Not part of the graded submission.
 
 Usage:
     python3 tools/urdf_viewer_3d.py              # built-in sample robot, serves on 127.0.0.1:8801
@@ -19,7 +18,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from demo_fk import compute_link_poses  # noqa: E402
+import fk  # noqa: E402
 from transform import transform_to_pose  # noqa: E402
 from urdf import RobotModel, parse_urdf  # noqa: E402
 from urdf_demo import SAMPLE_ROBOT  # noqa: E402
@@ -30,7 +29,7 @@ DEFAULT_PORT = 8801
 
 def build_scene_data(model: RobotModel) -> dict:
     """{"links": [{"name", "position" [x,y,z], "quaternion" [x,y,z,w]}], "bones": [[parent, child]]}"""
-    poses = compute_link_poses(model)
+    poses = fk.link_transforms(model.root_link, fk.joint_edges(model, {}), fk.identity_pose())
     links = []
     for link in model.links:
         translation, quat_wxyz = transform_to_pose(poses[link.name])
@@ -56,7 +55,7 @@ PAGE_TEMPLATE = """<!doctype html>
 <body>
 <div id="overlay">
   <h1>{title}</h1>
-  <div class="note">zero-configuration FK, demo_fk.py (temporary, not src/fk.py) &mdash; drag to orbit, scroll to zoom</div>
+  <div class="note">zero-configuration FK from src/fk.py &mdash; drag to orbit, scroll to zoom</div>
 </div>
 <script type="importmap">
 {{

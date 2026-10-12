@@ -25,7 +25,7 @@ make clean   # removes __pycache__
 - `src/robot_world_state_publisher.py` — `/tf` + `/global_pose` → `/xform_world`.
 - `tests/` — unit tests per module, `test_integration.py` over the wire against `src/main.py`, and
   `client_helper.py` (raw-socket TCP/JSON client).
-- `tools/` — non-graded URDF demo and viewers. `tools/demo_fk.py` is a temporary FK stand-in for the viewer.
+- `tools/` — non-graded URDF demo and viewers.
 - `prompts/` — Plan/Implement/Audit/Test agent instructions, reused across sessions.
 - `agent-notes/` — handoff notes (`PLAN.md`, `HANDOVER.md`).
 - `spec/` — project spec summary, protocol reference, submission packaging notes.
@@ -35,5 +35,4 @@ make clean   # removes __pycache__
 Plan → Implement → Audit → Test, one phase per session, each reading `prompts/<PHASE>.md` and
 `agent-notes/`. Current status and remaining steps live in `agent-notes/PLAN.md`.
 
-Not yet built: `src/fk.py` (stubs only; `tests/test_fk.py` and `tests/test_integration.py` wait on it), and
-the `make demo` nodes (`joint_state_publisher`, `finite_state_machine`).
+Not yet built: the `make demo` nodes (`joint_state_publisher`, `finite_state_machine`).

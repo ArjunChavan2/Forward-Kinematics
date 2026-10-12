@@ -109,9 +109,8 @@ The `make demo` nodes (`joint_state_publisher`, `finite_state_machine`) come aft
 3. `transform.py` (owner-written): axis-angle to quaternion, quaternion to matrix, matrix to quaternion, RPY,
    4x4 composition, with unit tests against hand-computed values. DONE.
 4. `urdf.py` parser with tests for direct-child rule, CRLF, comments, entity refs, joint types. DONE.
-5. `fk.py` tree build and composition with tests for fixed joints and a 2-link chain. NOT DONE (owner-written,
-   blocking step). `tools/demo_fk.py` is a throwaway, non-graded stand-in with the same contract, used only to
-   verify steps 6-8's wiring.
+5. `fk.py` tree build and composition with tests for fixed joints and a 2-link chain. DONE (owner-written).
+   Verified against an independent quaternion FK on Fetch, Baxter, and PR2 (errors ~1e-15).
 6. `robot_state_publisher.py`: reload on higher `robot_description` version, validation, keep-previous on
    rejection, description status, `/joint_states` subscription, `/tf` timer. DONE, wiring verified against a
    throwaway fk adapter; will produce real `/tf` once `fk.py` (step 5) is written.
