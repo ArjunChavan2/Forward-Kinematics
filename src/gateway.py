@@ -26,6 +26,7 @@ PORT = 9095
 
 SERVICE_CALL_TIMEOUT_S = 5.0
 MAX_LINE_BYTES = 4 * 1024 * 1024  # protocol: "Implementations may reject a line larger than 4 MiB"
+MAX_SEND_BUFFER_BYTES = 16 * 1024 * 1024  # per client; above this, topic messages to it are dropped
 
 
 def log(*args: Any) -> None:
@@ -41,6 +42,10 @@ class Connection:
         self.advertised_services: set[str] = set()
 
     def send(self, message: dict) -> None:
+        # A client that stops reading would otherwise buffer every topic message forever (~20 MiB/s with a
+        # 1 MiB robot). Topics republish every tick, so dropping a stale one is safe; service replies never drop.
+        if message.get("op") == "publish" and self._writer.transport.get_write_buffer_size() > MAX_SEND_BUFFER_BYTES:
+            return
         try:
             line = json.dumps(message, separators=(",", ":")) + "\n"
             self._writer.write(line.encode("utf-8"))

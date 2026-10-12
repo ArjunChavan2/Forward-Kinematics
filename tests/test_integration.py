@@ -1,4 +1,5 @@
 """Over-the-wire tests: start `src/main.py` (what `make run` runs) and talk to it on 127.0.0.1:9095."""
+import json
 import math
 import os
 import socket
@@ -28,6 +29,17 @@ def _fk_written() -> bool:
     except NotImplementedError:
         return False
     return True
+
+
+def _big_urdf() -> str:
+    """As many joints as fit in a 1 MiB set_param line (~4,700): the worst case for per-tick work."""
+    links, joints, i = ['<link name="l0"/>'], [], 0
+    while len(json.dumps("".join(links + joints))) < 1_000_000 - 4096:
+        i += 1
+        links.append(f'<link name="l{i}"/>')
+        joints.append(f'<joint name="j{i}" type="revolute"><parent link="l{(i - 1) // 2}"/><child link="l{i}"/>'
+                      f'<origin xyz="0.1 0 0.05" rpy="0 0 0.1"/><axis xyz="0 0 1"/><limit lower="-1" upper="1"/></joint>')
+    return "<robot>" + "".join(links + joints) + "</robot>"
 
 
 def _is_topic(topic):
@@ -60,6 +72,9 @@ class WireTest(unittest.TestCase):
         except subprocess.TimeoutExpired:
             self.proc.kill()
             self.proc.wait()
+
+    def server_rss_mib(self) -> int:
+        return int(subprocess.check_output(["ps", "-o", "rss=", "-p", str(self.proc.pid)])) // 1024
 
     def load_robot(self, urdf: str = CHAIN_URDF) -> None:
         reply = self.client.call_service("/param_server/set_param", {"name": "robot_description", "value": urdf})
@@ -118,6 +133,35 @@ class WireTest(unittest.TestCase):
             count += 1
         self.assertGreaterEqual(count, 10)
 
+    def test_rates_hold_at_5hz_with_a_1mib_description(self) -> None:
+        self.client.subscribe("/tf")
+        self.client.subscribe("/xform_world")
+        self.load_robot(_big_urdf())
+        self.recv("/xform_world", timeout=10)
+        counts = {"/tf": 0, "/xform_world": 0}
+        start = time.monotonic()
+        while time.monotonic() - start < 3.0:
+            topic = self.client.recv_line(timeout=5).get("topic")
+            if topic in counts:
+                counts[topic] += 1
+        self.assertGreaterEqual(counts["/tf"], 15, counts)
+        self.assertGreaterEqual(counts["/xform_world"], 15, counts)
+
+    def test_subscriber_that_stops_reading_does_not_grow_server_memory(self) -> None:
+        stalled = socket.create_connection((HOST, PORT))
+        self.addCleanup(stalled.close)
+        for topic in ("/tf", "/xform_world"):
+            stalled.sendall(json.dumps({"op": "subscribe", "topic": topic}).encode() + b"\n")
+        self.load_robot(_big_urdf())
+        time.sleep(1.0)  # let the socket buffers fill
+        before = self.server_rss_mib()
+        time.sleep(6.0)  # unbounded buffering grew ~20 MiB/s here
+        growth = self.server_rss_mib() - before
+        self.assertLess(growth, 40, f"server grew {growth} MiB in 6 s with one stalled subscriber")
+        # The server still works for everyone else.
+        self.client.subscribe("/tf")
+        self.recv("/tf", timeout=5)
+
     def test_joint_states_move_tf_and_stamp_is_copied_verbatim(self) -> None:
         self.client.subscribe("/tf")
         self.load_robot()
@@ -137,6 +181,36 @@ class WireTest(unittest.TestCase):
         self.assertVecAlmostEqual([sign * r[k] for k in "xyzw"], [0, 0, S, S])
         t = entries["link3"]["transform"]["translation"]
         self.assertVecAlmostEqual([t["x"], t["y"], t["z"]], [0, 0, 1.0])
+
+    def test_reload_replaces_the_robot_and_a_bad_description_keeps_it(self) -> None:
+        self.client.subscribe("/tf")
+        self.client.subscribe("/xform_world")
+        self.load_robot()
+        self.recv("/xform_world")
+        # Same root name, different children: merging old and new edges would still form one valid tree.
+        self.load_robot('<robot><link name="base_link"/><link name="b1"/>'
+                        '<joint name="k1" type="fixed"><parent link="base_link"/><child link="b1"/></joint></robot>')
+        robot_b = {"base_link", "b1"}
+        msg = self.recv("/xform_world", lambda m: "b1" in {e["child_frame_id"] for e in m["transforms"]})
+        self.assertEqual({e["child_frame_id"] for e in msg["transforms"]} - {"global_frame"}, robot_b)
+
+        self.load_robot("<robot><link name=")
+        status = self.client.call_service("/param_server/get_param", {"name": STATUS_PARAM})["values"]["value"]
+        deadline = time.monotonic() + 3
+        while status["accepted"] and time.monotonic() < deadline:  # wait for the node to process the bad one
+            time.sleep(0.05)
+            status = self.client.call_service("/param_server/get_param", {"name": STATUS_PARAM})["values"]["value"]
+        self.assertFalse(status["accepted"], status)
+        self.assertNotEqual(status["error"], "")
+        self.assertLess(status["loaded_version"], status["version"])
+        # /tf keeps flowing with robot B: far more messages than could have been queued before the rejection.
+        children, start = [], time.monotonic()
+        while time.monotonic() - start < 1.5:
+            children.append(frozenset(self.tf_by_child(self.recv("/tf"))))
+        self.assertGreaterEqual(len(children), 10)
+        self.assertEqual(set(children), {frozenset({"b1"})})
+        msg = self.recv("/xform_world")
+        self.assertEqual({e["child_frame_id"] for e in msg["transforms"]} - {"global_frame"}, robot_b)
 
     def test_xform_world_composes_global_pose(self) -> None:
         self.client.subscribe("/xform_world")

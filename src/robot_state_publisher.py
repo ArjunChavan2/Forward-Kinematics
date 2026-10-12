@@ -145,6 +145,11 @@ class RobotStatePublisher:
         self.registry.publish(TF_TOPIC, {"transforms": transforms})
 
     async def publish_tf_loop(self) -> None:
+        # Sleep only until the next tick's deadline: sleeping a full interval after the work made the period
+        # work + interval, which fell under 5 Hz on ~1 MiB descriptions.
+        loop = asyncio.get_running_loop()
+        deadline = loop.time()
         while True:
             self.publish_tf()
-            await asyncio.sleep(TF_INTERVAL_S)
+            deadline = max(deadline + TF_INTERVAL_S, loop.time())  # running late: don't burst to catch up
+            await asyncio.sleep(deadline - loop.time())
