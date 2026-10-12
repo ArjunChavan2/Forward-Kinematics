@@ -180,6 +180,11 @@ class RootOfEdgesTest(FkTestCase):
         self.assertEqual(fk.root_of_edges(edges), "base_link")
         self.assertEqual(fk.root_of_edges(list(reversed(edges))), "base_link")
 
+    def test_root_with_several_children_is_still_one_root(self) -> None:
+        # Real robots branch at the root (e.g. PR2's base_link), so the root appears as parent more than once.
+        edges = [("base", "left", IDENTITY_4), ("base", "right", IDENTITY_4), ("left", "hand", IDENTITY_4)]
+        self.assertEqual(fk.root_of_edges(edges), "base")
+
     def test_empty_edges_raise(self) -> None:
         self.assertRejects([])
 

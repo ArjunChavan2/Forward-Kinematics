@@ -172,14 +172,18 @@ def make_transform(rotation: Matrix, translation: Vec3) -> Matrix:
 
 
 def matmul(a: Matrix, b: Matrix) -> Matrix:
-    """Return the 3x3 matrix product a · b.
+    """Return the matrix product a · b for any compatible sizes (3x3, 4x4, ...).
 
-    Entry (i, j) of the result is the sum over k of a[i][k] * b[k][j]. The product is not commutative.
+    Entry (i, j) of the result is the sum over k of a[i][k] * b[k][j]. a's column count must equal b's row
+    count. The product is not commutative.
     """
-    ret = [[0 for i in range(3)] for j in range(3)]
-    for i in range(3):
-        for j in range(3):
-            for k in range(3):
+    rows, inner, cols = len(a), len(b), len(b[0])
+    if len(a[0]) != inner:
+        raise ValueError(f"cannot multiply {rows}x{len(a[0])} by {inner}x{cols}")
+    ret = [[0.0 for j in range(cols)] for i in range(rows)]
+    for i in range(rows):
+        for j in range(cols):
+            for k in range(inner):
                 ret[i][j] += a[i][k] * b[k][j]
     return ret
 
@@ -248,6 +252,6 @@ def joint_motion(joint_type: str, axis: Vec3, q: float) -> Matrix:
         translation = [0, 0, 0]
         t = make_transform(mq, translation)
     else:
-        raise ValueError
+        raise ValueError(f"unknown joint type {joint_type!r} (expected revolute, continuous, prismatic, or fixed)")
     return t
         

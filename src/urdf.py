@@ -70,14 +70,14 @@ def _parse_root(text: str) -> ET.Element:
     Raises ValueError for empty or whitespace-only text, text that is not well-formed XML (catch
     ET.ParseError), or a root element whose tag is not "robot".
     """
+    if not text.strip():
+        raise ValueError("robot_description is empty or whitespace-only; expected URDF XML with a <robot> root")
     try:
-        l = len(text)
         root = ET.fromstring(text.lstrip())
-        if l == 0 or l == text.count(" ") or root.tag != "robot":
-            raise ValueError
-    except ET.ParseError:
-        raise ValueError
-    
+    except ET.ParseError as exc:
+        raise ValueError(f"robot_description is not well-formed XML: {exc}") from exc
+    if root.tag != "robot":
+        raise ValueError(f"root element is <{root.tag}>, expected <robot>")
     return root
         
 
@@ -85,7 +85,7 @@ def _parse_root(text: str) -> ET.Element:
 def _parse_number(token: str) -> float:
     """Parse one token against the spec's number grammar, rejecting what float() would wrongly accept."""
     if NUMBER_RE.fullmatch(token) is None:
-        raise ValueError
+        raise ValueError(f"{token!r} is not a valid number (expected a decimal like 1, -0.5, or 1e-3)")
     return float(token)
 
 
@@ -97,7 +97,7 @@ def _parse_vector(text: str, count: int = 3) -> tuple:
     """
     tokens = text.split()
     if len(tokens) != count:
-        raise ValueError
+        raise ValueError(f"expected {count} numbers separated by spaces, got {len(tokens)} in {text!r}")
     return tuple(_parse_number(t) for t in tokens)
 
 
@@ -107,7 +107,7 @@ def _parse_link(elem: ET.Element) -> Link:
     Raises ValueError if the element has no name attribute.
     """
     if "name" not in elem.attrib:
-        raise ValueError
+        raise ValueError("<link> has no name attribute")
     return Link(elem.attrib["name"])
 
 
@@ -123,18 +123,22 @@ def _parse_joint(elem: ET.Element) -> Joint:
     """
     name = elem.get("name")
     joint_type = elem.get("type")
-    if name is None or joint_type not in ["revolute", "continuous", "prismatic", "fixed"]:
-        raise ValueError
-    
+    if name is None:
+        raise ValueError("<joint> has no name attribute")
+    if joint_type is None:
+        raise ValueError("joint has no type attribute (expected revolute, continuous, prismatic, or fixed)")
+    if joint_type not in ["revolute", "continuous", "prismatic", "fixed"]:
+        raise ValueError(f"unknown joint type {joint_type!r} (expected revolute, continuous, prismatic, or fixed)")
+
     parent = elem.find("parent")
     if parent is None or parent.get("link") is None:
-        raise ValueError    
+        raise ValueError("joint is missing <parent link=\"...\"/>")
     else:
         parent = parent.get("link")
-    
+
     child = elem.find("child")
     if child is None or child.get("link") is None:
-        raise ValueError
+        raise ValueError("joint is missing <child link=\"...\"/>")
     else:
         child = child.get("link")
     
@@ -155,7 +159,7 @@ def _parse_joint(elem: ET.Element) -> Joint:
     if joint_type in ("revolute", "prismatic"):
         limit_elem = elem.find("limit")
         if limit_elem is None:
-            raise ValueError
+            raise ValueError(f"{joint_type} joint requires a <limit> element")
         lower = _parse_number(limit_elem.get("lower", "0"))
         upper = _parse_number(limit_elem.get("upper", "0"))
         limit = Limit(lower, upper)
@@ -192,7 +196,7 @@ def _parse_visual(elem: ET.Element) -> None:
     cylinder = geometry.find("cylinder")
     if cylinder is not None:
         if cylinder.get("radius") is None or cylinder.get("length") is None:
-            raise ValueError
+            raise ValueError("visual <cylinder> needs both radius and length attributes")
         _parse_number(cylinder.get("radius"))
         _parse_number(cylinder.get("length"))
         return
@@ -200,20 +204,21 @@ def _parse_visual(elem: ET.Element) -> None:
     sphere = geometry.find("sphere")
     if sphere is not None:
         if sphere.get("radius") is None:
-            raise ValueError
+            raise ValueError("visual <sphere> has no radius attribute")
         _parse_number(sphere.get("radius"))
         return
 
     mesh = geometry.find("mesh")
     if mesh is not None:
         if mesh.get("filename") is None:
-            raise ValueError
+            raise ValueError("visual <mesh> has no filename attribute")
         scale = mesh.get("scale")
         if scale is not None:
             _parse_vector(scale)
         return
 
-    raise ValueError
+    shapes = [child.tag for child in geometry]
+    raise ValueError(f"visual <geometry> has no box, cylinder, sphere, or mesh (found {shapes or 'nothing'})")
 
 
 
@@ -226,14 +231,17 @@ def _validate_robot(links: list[Link], joints: list[Joint]) -> str:
     """
     link_names = {link.name for link in links}
     for joint in joints:
-        if joint.parent not in link_names or joint.child not in link_names:
-            raise ValueError
+        for role, link in (("parent", joint.parent), ("child", joint.child)):
+            if link not in link_names:
+                raise ValueError(f"joint {joint.name!r} names {role} link {link!r}, which is not a <link> in this robot")
         if joint.joint_type in ("revolute", "continuous", "prismatic") and all(c == 0 for c in joint.axis):
-            raise ValueError
+            raise ValueError(f"{joint.joint_type} joint {joint.name!r} has a zero-length axis, so it has no direction to move in")
     child_names = {joint.child for joint in joints}
     roots = link_names - child_names
     if len(roots) != 1:
-        raise ValueError
+        if roots:
+            raise ValueError(f"expected exactly one root link (a link that is no joint's child), found {len(roots)}: {sorted(roots)}")
+        raise ValueError("no root link: every link is some joint's child, so the joints form a loop")
     return next(iter(roots))
 
 
@@ -250,11 +258,17 @@ def parse_urdf(text: str) -> RobotModel:
     links: list[Link] = []
     joints: list[Joint] = []
     for child in root:
-        if child.tag == "link":
-            links.append(_parse_link(child))
-            _parse_visual(child)
-        elif child.tag == "joint":
-            joints.append(_parse_joint(child))
+        if child.tag not in ("link", "joint"):
+            continue
+        # Prefix which element failed, since the inner messages don't know their element's name.
+        try:
+            if child.tag == "link":
+                links.append(_parse_link(child))
+                _parse_visual(child)
+            else:
+                joints.append(_parse_joint(child))
+        except ValueError as exc:
+            raise ValueError(f"<{child.tag} name={child.get('name')!r}>: {exc}") from exc
 
     root_link = _validate_robot(links, joints)
     return RobotModel(root_link, links, joints)

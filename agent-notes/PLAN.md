@@ -151,6 +151,9 @@ Decided items cite the decision. Undecided items remain open.
 2. Who writes the FK math (decided): the user (project owner) hand-writes `urdf.py`, `transform.py`, and
    `fk.py`. Agents build the transport, node wiring, `param_server`, and tests around them, following
    Project 2's split. Agents must not write the URDF parsing or FK math.
+   This split is for the owner's learning, not grading (authorship doesn't affect the grade). Small edits the
+   owner explicitly asks for in these files are fine to make without flagging -- e.g. the size-generic
+   `transform.matmul` (2026-10-12). Agents still don't write the FK functions themselves unprompted.
 3. Advertise rule (decided): Project 2 and Project 3 rely on Project 1's advertisement rules. External
    wire `publish` is dropped unless the connection holds an advertisement for that topic. The autograder
    advertises before publishing (confirmed by the user). Project 2 was changed to match (`a34ffc8`).
