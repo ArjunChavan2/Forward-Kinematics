@@ -119,7 +119,8 @@ The `make demo` nodes (`joint_state_publisher`, `finite_state_machine`) come aft
    `fk.root_of_edges`/`fk.link_transforms`, no FK math of its own), same caveat as step 6.
 8. `main.py` wiring. DONE. Readiness-within-10s not yet checked against a real robot, since that needs
    step 5.
-9. Integration tests over the wire using `client_helper.py`.
+9. Integration tests over the wire using `client_helper.py`. WRITTEN (`tests/test_integration.py`), skipped until `fk.py` exists; passes against a
+   scratch reference fk. `tests/test_fk.py` holds the step-5 unit tests, failing until `fk.py` is written.
 10. `joint_state_publisher.py` (ungraded, `make demo` only): reads `robot_description`, subscribes
     `/joint_trajectory`, keeps setpoints by joint name (including names not yet loaded), servos joints toward
     setpoints clamped to limits, publishes `/joint_states` at about 10 Hz. Reset service optional.
