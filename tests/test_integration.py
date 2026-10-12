@@ -199,6 +199,31 @@ class WireTest(unittest.TestCase):
         t = entries["link3"]["transform"]["translation"]
         self.assertVecAlmostEqual([t["x"], t["y"], t["z"]], [0, 0, 10.0])
 
+    def test_inputs_that_overflow_never_put_infinity_or_nan_on_the_wire(self) -> None:
+        def numbers(x):
+            if isinstance(x, dict):
+                return [n for v in x.values() for n in numbers(v)]
+            if isinstance(x, list):
+                return [n for v in x for n in numbers(v)]
+            return [x] if isinstance(x, float) else []
+
+        self.client.subscribe("/tf")
+        self.client.subscribe("/xform_world")
+        self.load_robot()
+        self.recv("/xform_world")
+        self.client.advertise("/joint_states")
+        self.client.advertise("/global_pose")
+        # 1e308 is a valid JSON number, but 1e308 * axis 2 overflows. Python's json also parses a bare NaN.
+        self.client.publish("/joint_states", {"header": {"stamp": {"sec": 9, "nanosec": 0}, "frame_id": ""},
+                                              "name": ["j3"], "position": [1e308]})
+        self.client.send({"op": "publish", "topic": "/joint_states", "msg": {"name": ["j1"], "position": [math.nan]}})
+        self.client.publish("/global_pose", {"position": {"x": math.nan, "y": 0.0, "z": 0.0},
+                                             "orientation": {"x": 0.0, "y": 0.0, "z": S, "w": S}})
+        start = time.monotonic()
+        while time.monotonic() - start < 1.0:
+            msg = self.client.recv_line()
+            self.assertTrue(all(math.isfinite(n) for n in numbers(msg)), msg)
+
     def test_late_subscriber_gets_a_full_message_within_one_period(self) -> None:
         self.client.subscribe("/xform_world")
         self.load_robot()

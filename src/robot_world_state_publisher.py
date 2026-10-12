@@ -8,6 +8,8 @@ Per spec: compute from the latest /tf message alone, never merge in edges from a
 """
 from __future__ import annotations
 
+import math
+
 from registry import Registry
 from transform import make_transform, quat_to_matrix, transform_to_column_major
 
@@ -44,7 +46,9 @@ class RobotWorldStatePublisher:
         pos = msg["position"]
         ori = msg["orientation"]
         quat_wxyz = (ori["w"], ori["x"], ori["y"], ori["z"])
-        self.global_pose = make_transform(quat_to_matrix(quat_wxyz), [pos["x"], pos["y"], pos["z"]])
+        pose = make_transform(quat_to_matrix(quat_wxyz), [pos["x"], pos["y"], pos["z"]])
+        if all(math.isfinite(v) for row in pose for v in row):  # /xform_world must never carry inf/NaN
+            self.global_pose = pose
 
     def _on_tf(self, msg: dict) -> None:
         entries = msg.get("transforms") or []

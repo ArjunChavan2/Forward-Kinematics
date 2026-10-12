@@ -9,6 +9,7 @@ read from fk.py directly, since that module is the hand-written forward-kinemati
 from __future__ import annotations
 
 import asyncio
+import math
 from typing import Any, Callable, Protocol
 
 import fk
@@ -39,6 +40,10 @@ LoadRobot = Callable[[str], LoadedRobot]
 ZERO_STAMP = {"sec": 0, "nanosec": 0}
 
 
+def _all_finite(edges: list) -> bool:
+    return all(math.isfinite(v) for _, _, matrix in edges for row in matrix for v in row)
+
+
 class RobotStatePublisher:
     def __init__(self, registry: Registry, load_robot: LoadRobot) -> None:
         self.registry = registry
@@ -60,22 +65,27 @@ class RobotStatePublisher:
             self._on_joint_states(message["msg"])
 
     def _on_joint_states(self, msg: dict) -> None:
-        self._last_names = msg.get("name") or []
-        self._last_positions = msg.get("position") or []
+        names, positions = msg.get("name") or [], msg.get("position") or []
+        resolved = self._positions_for(names, positions)
+        # Huge positions (1e308) overflow to inf/NaN, which /tf must never carry: ignore that whole message.
+        if self.robot is not None and not _all_finite(fk.joint_edges(self.robot, resolved)):
+            return
+        self._last_names, self._last_positions = names, positions
         self.stamp = msg.get("header", {}).get("stamp", self.stamp)
-        self._resolve_positions()
+        self.positions = resolved
 
     def _resolve_positions(self) -> None:
-        """Rebuild self.positions for the current robot's movable joints: named value if given,
-        0 otherwise (spec: "a movable joint the message does not name is at 0"). Unknown names and
-        fixed joints are ignored, since we only iterate the robot's own movable joints."""
-        self.positions = {}
+        self.positions = self._positions_for(self._last_names, self._last_positions)
+
+    def _positions_for(self, names: list, positions: list) -> dict[str, float]:
+        """Positions for the current robot's movable joints: named value if given, 0 otherwise
+        (spec: "a movable joint the message does not name is at 0"). Unknown names and fixed joints
+        are ignored, since we only iterate the robot's own movable joints."""
         if self.robot is None:
-            return
-        given = dict(zip(self._last_names, self._last_positions))
-        for joint in self.robot.joints:
-            if joint.joint_type != "fixed":
-                self.positions[joint.name] = float(given.get(joint.name, 0.0))
+            return {}
+        given = dict(zip(names, positions))
+        return {joint.name: float(given.get(joint.name, 0.0))
+                for joint in self.robot.joints if joint.joint_type != "fixed"}
 
     def poll_once(self) -> bool:
         ok, values, _ = self.registry.call_service_sync(GET_PARAM, {"name": DESCRIPTION_PARAM})
