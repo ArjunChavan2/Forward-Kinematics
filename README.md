@@ -10,6 +10,7 @@ the Project 1 rosbridge-style TCP/JSON gateway (`127.0.0.1:9095`). Spec:
 make build   # offline, noninteractive, compiles all of src/
 make run     # foreground, listens on 127.0.0.1:9095, Ctrl-C / SIGTERM to stop cleanly
 make test    # unit + integration tests
+make demo    # make run + joint_state_publisher + finite_state_machine (not graded)
 make clean   # removes __pycache__
 ```
 
@@ -25,7 +26,10 @@ make clean   # removes __pycache__
 - `src/robot_world_state_publisher.py` — `/tf` + `/global_pose` → `/xform_world`.
 - `tests/` — unit tests per module, `test_integration.py` over the wire against `src/main.py`, and
   `client_helper.py` (raw-socket TCP/JSON client).
-- `tools/` — non-graded URDF demo and viewers.
+- `tools/` — non-graded URDF demo and viewers. With `make demo` running,
+  `python3 tools/live_viewer.py path/to/fetch.urdf fsm/fetch_wave.json` loads a robot and choreography and
+  serves a live viewer at http://127.0.0.1:8803/ that draws every link from `/xform_world`.
+- `fsm/` — choreographies for `finite_state_machine` (`fetch_wave.json`, `sample_swing.json`).
 - `prompts/` — Plan/Implement/Audit/Test agent instructions, reused across sessions.
 - `agent-notes/` — handoff notes (`PLAN.md`, `HANDOVER.md`).
 - `spec/` — project spec summary, protocol reference, submission packaging notes.

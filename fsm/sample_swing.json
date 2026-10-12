@@ -1,0 +1,43 @@
+{
+  "initial_state": "left",
+  "states": [
+    {
+      "name": "left",
+      "target": {
+        "joint_names": [
+          "shoulder"
+        ],
+        "positions": [
+          1.5
+        ]
+      },
+      "epsilon": 0.02,
+      "on_arrival": "to_right",
+      "transitions": [
+        {
+          "name": "to_right",
+          "next_state": "right"
+        }
+      ]
+    },
+    {
+      "name": "right",
+      "target": {
+        "joint_names": [
+          "shoulder"
+        ],
+        "positions": [
+          -1.5
+        ]
+      },
+      "epsilon": 0.02,
+      "on_arrival": "to_left",
+      "transitions": [
+        {
+          "name": "to_left",
+          "next_state": "left"
+        }
+      ]
+    }
+  ]
+}

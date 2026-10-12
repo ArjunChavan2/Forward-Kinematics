@@ -47,10 +47,12 @@ def _is_topic(topic):
 
 
 @unittest.skipUnless(_fk_written(), "src/fk.py is not implemented yet")
-class WireTest(unittest.TestCase):
+class ServerTestCase(unittest.TestCase):
+    ARGS: list[str] = []  # main.py arguments: [] is `make run`, ["--demo"] is `make demo`
+
     def setUp(self) -> None:
         self.started = time.monotonic()
-        self.proc = subprocess.Popen([sys.executable, os.path.join(SRC, "main.py")],
+        self.proc = subprocess.Popen([sys.executable, os.path.join(SRC, "main.py"), *self.ARGS],
                                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         self.addCleanup(self._stop)
         deadline = time.monotonic() + 10
@@ -95,7 +97,17 @@ class WireTest(unittest.TestCase):
         for a, e in zip(actual, expected, strict=True):
             self.assertAlmostEqual(a, e, delta=TOL, msg=f"{actual} != {expected}")
 
-    # -- tests -----------------------------------------------------------------
+
+class WireTest(ServerTestCase):
+    def test_make_run_starts_no_demo_nodes(self) -> None:
+        self.client.subscribe("/joint_states")
+        self.load_robot()
+        self.client.advertise("/joint_trajectory")
+        self.client.publish("/joint_trajectory", {"joint_names": ["j1"], "points": [{"positions": [1.0]}]})
+        for service in ("/fsm/list_saved", "/joint_state_publisher/reset"):
+            self.assertEqual(self.client.call_service(service, {})["status"], "no provider")
+        with self.assertRaises((TimeoutError, socket.timeout)):
+            self.recv("/joint_states", timeout=0.5)
 
     def test_ready_within_10s_of_start(self) -> None:
         self.client.subscribe("/xform_world")
@@ -288,6 +300,30 @@ class WireTest(unittest.TestCase):
         # Global Rz(90°) · local (0, 1, 2) + (10, 0, 0) = (9, 0, 2).
         self.assertVecAlmostEqual(self.xform_translation(msg, "base_link"), [10, 0, 0])
         self.assertVecAlmostEqual(self.xform_translation(msg, "link3"), [9, 0, 2])
+
+
+class DemoWireTest(ServerTestCase):
+    ARGS = ["--demo"]
+
+    def test_fsm_choreography_moves_the_robot_on_tf(self) -> None:
+        self.client.subscribe("/tf")
+        self.client.subscribe("/fsm/status")
+        self.load_robot()
+        self.recv("/tf")
+        table = {"initial_state": "home", "states": [
+            {"name": "home", "target": {"joint_names": ["j1"], "positions": [0.0]}, "epsilon": 0.02,
+             "on_arrival": "go", "transitions": [{"name": "go", "next_state": "turned"}]},
+            {"name": "turned", "target": {"joint_names": ["j1"], "positions": [0.5]}, "epsilon": 0.02}]}
+        reply = self.client.call_service("/fsm/update_logic", table)
+        self.assertTrue(reply["result"], reply)
+        # home is reached at once (j1 starts at 0), then the servo turns j1 to 0.5 rad in about 0.5 s.
+        self.recv("/fsm/status", lambda m: m["current_state"] == "turned" and m["last_transition"] == "go", timeout=3)
+
+        def link1_angle(m):
+            r = self.tf_by_child(m)["link1"]["transform"]["rotation"]
+            return 2 * math.atan2(r["z"], r["w"])
+        msg = self.recv("/tf", lambda m: abs(link1_angle(m) - 0.5) < 1e-6, timeout=5)
+        self.assertNotEqual(msg["transforms"][0]["header"]["stamp"], {"sec": 0, "nanosec": 0})
 
 
 if __name__ == "__main__":
