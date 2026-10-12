@@ -182,6 +182,36 @@ class WireTest(unittest.TestCase):
         t = entries["link3"]["transform"]["translation"]
         self.assertVecAlmostEqual([t["x"], t["y"], t["z"]], [0, 0, 1.0])
 
+    def test_each_joint_states_message_replaces_the_last_and_is_not_clamped(self) -> None:
+        self.client.subscribe("/tf")
+        self.load_robot()
+        self.recv("/tf")
+        self.client.advertise("/joint_states")
+        self.client.publish("/joint_states", {"header": {"stamp": {"sec": 1, "nanosec": 0}, "frame_id": ""},
+                                              "name": ["j1"], "position": [math.pi / 2]})
+        self.recv("/tf", lambda m: m["transforms"][0]["header"]["stamp"]["sec"] == 1)
+        # j3 = 5 is past its limit of 1: used as given (5 * axis 2 = 10). j1 is not named, so it goes back to 0.
+        self.client.publish("/joint_states", {"header": {"stamp": {"sec": 2, "nanosec": 0}, "frame_id": ""},
+                                              "name": ["j3"], "position": [5.0]})
+        entries = self.tf_by_child(self.recv("/tf", lambda m: m["transforms"][0]["header"]["stamp"]["sec"] == 2))
+        r = entries["link1"]["transform"]["rotation"]
+        self.assertVecAlmostEqual([r["x"], r["y"], r["z"], abs(r["w"])], [0, 0, 0, 1])
+        t = entries["link3"]["transform"]["translation"]
+        self.assertVecAlmostEqual([t["x"], t["y"], t["z"]], [0, 0, 10.0])
+
+    def test_late_subscriber_gets_a_full_message_within_one_period(self) -> None:
+        self.client.subscribe("/xform_world")
+        self.load_robot()
+        self.recv("/xform_world")
+        for topic, count in (("/tf", 3), ("/xform_world", 4)):
+            late = Client()
+            self.addCleanup(late.close)
+            start = time.monotonic()
+            late.subscribe(topic)
+            msg = late.recv_matching(_is_topic(topic), timeout=2)["msg"]
+            self.assertLess(time.monotonic() - start, 0.2, topic)  # 5 Hz floor = 0.2 s period
+            self.assertEqual(len(msg["transforms"]), count, topic)
+
     def test_reload_replaces_the_robot_and_a_bad_description_keeps_it(self) -> None:
         self.client.subscribe("/tf")
         self.client.subscribe("/xform_world")
