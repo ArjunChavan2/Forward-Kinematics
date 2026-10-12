@@ -183,6 +183,52 @@ class ValidateRobotAndParseUrdfTest(unittest.TestCase):
                 "</robot>"
             )
 
+    def test_default_xmlns_on_robot_loads(self) -> None:
+        model = parse_urdf(
+            '<robot xmlns="http://example.com/urdf"><link name="a"/><link name="b"/>'
+            '<joint name="j1" type="fixed"><parent link="a"/><child link="b"/></joint>'
+            "</robot>"
+        )
+        self.assertEqual(model.root_link, "a")
+        self.assertEqual([j.name for j in model.joints], ["j1"])
+
+    def test_malformed_visual_origin_rejected(self) -> None:
+        with self.assertRaises(ValueError):
+            parse_urdf('<robot><link name="a"><visual><origin xyz="1 2"/>'
+                       '<geometry><sphere radius="1"/></geometry></visual></link></robot>')
+
+    def test_robot_with_no_links_rejected(self) -> None:
+        with self.assertRaises(ValueError):
+            parse_urdf("<robot/>")
+
+    def test_loop_beside_a_valid_root_rejected(self) -> None:
+        # One root (a), but b and c point at each other; FK over this would never terminate.
+        with self.assertRaises(ValueError):
+            parse_urdf(
+                '<robot><link name="a"/><link name="b"/><link name="c"/>'
+                '<joint name="j1" type="fixed"><parent link="a"/><child link="b"/></joint>'
+                '<joint name="j2" type="fixed"><parent link="b"/><child link="c"/></joint>'
+                '<joint name="j3" type="fixed"><parent link="c"/><child link="b"/></joint>'
+                "</robot>"
+            )
+
+    def test_loop_disconnected_from_root_rejected(self) -> None:
+        with self.assertRaises(ValueError):
+            parse_urdf(
+                '<robot><link name="a"/><link name="b"/><link name="c"/>'
+                '<joint name="j1" type="fixed"><parent link="b"/><child link="c"/></joint>'
+                '<joint name="j2" type="fixed"><parent link="c"/><child link="b"/></joint>'
+                "</robot>"
+            )
+
+    def test_non_finite_number_rejected(self) -> None:
+        with self.assertRaises(ValueError):
+            parse_urdf(
+                '<robot><link name="a"/><link name="b"/>'
+                '<joint name="j1" type="fixed"><parent link="a"/><child link="b"/><origin xyz="1e400 0 0"/></joint>'
+                "</robot>"
+            )
+
     def test_joint_to_missing_link_rejected(self) -> None:
         with self.assertRaises(ValueError):
             parse_urdf(

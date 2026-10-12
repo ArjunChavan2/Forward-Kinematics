@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 
 from transform import Vec3
 
+import math
 import re
 import xml.etree.ElementTree as ET
 
@@ -76,6 +77,12 @@ def _parse_root(text: str) -> ET.Element:
         root = ET.fromstring(text.lstrip())
     except ET.ParseError as exc:
         raise ValueError(f"robot_description is not well-formed XML: {exc}") from exc
+    # A default xmlns="..." on <robot> makes ElementTree spell every tag "{uri}tag"; the spec says it must load.
+    if root.tag.startswith("{"):
+        ns = root.tag[:root.tag.index("}") + 1]
+        for elem in root.iter():
+            if elem.tag.startswith(ns):
+                elem.tag = elem.tag[len(ns):]
     if root.tag != "robot":
         raise ValueError(f"root element is <{root.tag}>, expected <robot>")
     return root
@@ -86,7 +93,10 @@ def _parse_number(token: str) -> float:
     """Parse one token against the spec's number grammar, rejecting what float() would wrongly accept."""
     if NUMBER_RE.fullmatch(token) is None:
         raise ValueError(f"{token!r} is not a valid number (expected a decimal like 1, -0.5, or 1e-3)")
-    return float(token)
+    value = float(token)
+    if not math.isfinite(value):  # e.g. 1e400 overflows to inf, which JSON output must never carry
+        raise ValueError(f"{token!r} is too large to represent as a finite number")
+    return value
 
 
 def _parse_vector(text: str, count: int = 3) -> tuple:
@@ -182,6 +192,10 @@ def _parse_visual(elem: ET.Element) -> None:
     visual = elem.find("visual")
     if visual is None:
         return
+    origin = visual.find("origin")
+    if origin is not None:
+        _parse_vector(origin.get("xyz", "0 0 0"))
+        _parse_vector(origin.get("rpy", "0 0 0"))
     geometry = visual.find("geometry")
     if geometry is None:
         raise ValueError("visual has no geometry")
@@ -229,6 +243,8 @@ def _validate_robot(links: list[Link], joints: list[Joint]) -> str:
     exactly one root (a link that is no joint's child), or if a movable (revolute/continuous/prismatic)
     joint's axis is zero-length (our own choice; the spec leaves this unspecified).
     """
+    if not links:
+        raise ValueError("<robot> has no direct-child <link>; a robot needs at least one link")
     link_names = {link.name for link in links}
     for joint in joints:
         for role, link in (("parent", joint.parent), ("child", joint.child)):
@@ -242,7 +258,27 @@ def _validate_robot(links: list[Link], joints: list[Joint]) -> str:
         if roots:
             raise ValueError(f"expected exactly one root link (a link that is no joint's child), found {len(roots)}: {sorted(roots)}")
         raise ValueError("no root link: every link is some joint's child, so the joints form a loop")
-    return next(iter(roots))
+    root = next(iter(roots))
+
+    # One root alone doesn't make a tree: a loop can sit beside it (a->b, b->c, c->b), and FK would never finish.
+    parent_joint: dict[str, str] = {}
+    children: dict[str, list[str]] = {}
+    for joint in joints:
+        if joint.child in parent_joint:
+            raise ValueError(f"link {joint.child!r} is the child of two joints ({parent_joint[joint.child]!r} and "
+                             f"{joint.name!r}); each link may hang from only one joint")
+        parent_joint[joint.child] = joint.name
+        children.setdefault(joint.parent, []).append(joint.child)
+    reached, stack = {root}, [root]
+    while stack:
+        for child in children.get(stack.pop(), []):
+            if child not in reached:
+                reached.add(child)
+                stack.append(child)
+    if reached != link_names:
+        raise ValueError(f"links {sorted(link_names - reached)} cannot be reached from root {root!r}; "
+                         f"the joints between them form a loop")
+    return root
 
 
 def parse_urdf(text: str) -> RobotModel:

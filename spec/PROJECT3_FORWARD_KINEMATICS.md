@@ -1,8 +1,8 @@
 # Project 3 — Forward Kinematics
 
 Source: https://autorob.org/projects/project3/ (page text extracted in a browser, not a model summary).
-The page links two further specs, `spec/FK_API.md` and `spec/ROBOT_DESCRIPTION.md`. They are not in this
-repo yet. The page says that if the handout and those specs disagree, the specs win.
+The page links two further specs, `spec/FK_API.md` and `spec/ROBOT_DESCRIPTION.md`
+(both fetched). The page says that if the handout and those specs disagree, the specs win.
 
 ## Architecture
 

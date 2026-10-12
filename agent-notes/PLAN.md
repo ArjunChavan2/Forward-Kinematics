@@ -116,10 +116,8 @@ The `make demo` nodes (`joint_state_publisher`, `finite_state_machine`) come aft
    throwaway fk adapter; will produce real `/tf` once `fk.py` (step 5) is written.
 7. `robot_world_state_publisher.py`: `/tf` and `/global_pose` → `/xform_world`. DONE (reuses
    `fk.root_of_edges`/`fk.link_transforms`, no FK math of its own), same caveat as step 6.
-8. `main.py` wiring. DONE. Readiness-within-10s not yet checked against a real robot, since that needs
-   step 5.
-9. Integration tests over the wire using `client_helper.py`. WRITTEN (`tests/test_integration.py`), skipped until `fk.py` exists; passes against a
-   scratch reference fk. `tests/test_fk.py` holds the step-5 unit tests, failing until `fk.py` is written.
+8. `main.py` wiring. DONE. Ready in ~0.2 s with Fetch, Baxter, and PR2 over the wire.
+9. Integration tests over the wire using `client_helper.py`. DONE (`tests/test_integration.py`), passing. `tests/test_fk.py` holds the step-5 unit tests.
 10. `joint_state_publisher.py` (ungraded, `make demo` only): reads `robot_description`, subscribes
     `/joint_trajectory`, keeps setpoints by joint name (including names not yet loaded), servos joints toward
     setpoints clamped to limits, publishes `/joint_states` at about 10 Hz. Reset service optional.
@@ -163,9 +161,9 @@ Decided items cite the decision. Undecided items remain open.
 6. Message shapes (decided by the fetched spec): `/joint_states`, `/tf`, `/xform_world`, and `/global_pose`
    follow the formats in the spec file. `/xform_world` matrices are 4x4 column-major.
 7. Stdlib only, no numpy (confirmed by the user for Project 3).
-8. Startup probe (deferred by the user): which service the grader calls with `{}` at startup, and the reply
-   it expects. Revisit before grading. Project 2's grader failed the whole run when a service was missing,
-   so every standard service must reply promptly to `{}`.
+8. Startup probe (answered by `spec/FK_API.md`): `/param_server/set_param` and `get_param` must answer within
+   10 s of `make run`, and "ready" means a small URDF set then is accepted and reaches `/tf` and `/xform_world`.
+   `tests/test_integration.py` checks this.
 
 ## Verification strategy
 

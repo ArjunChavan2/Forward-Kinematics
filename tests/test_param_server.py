@@ -53,13 +53,13 @@ class ParamServerTest(unittest.TestCase):
             self.assertFalse(ok, args)
             self.assertNotEqual(status, "", args)
 
-    def test_set_without_value_is_rejected_and_leaves_store_unchanged(self) -> None:
+    def test_set_without_value_stores_null(self) -> None:
         self.call(SET_PARAM, {"name": "k", "value": 1})
-        ok, _, status = self.call(SET_PARAM, {"name": "k"})
-        self.assertFalse(ok)
-        self.assertNotEqual(status, "")
+        ok, values, _ = self.call(SET_PARAM, {"name": "k"})
+        self.assertTrue(ok)
+        self.assertEqual(values, {"version": 2})
         _, values, _ = self.call(GET_PARAM, {"name": "k"})
-        self.assertEqual(values, {"value": 1, "version": 1})
+        self.assertEqual(values, {"value": None, "version": 2})
 
     def test_set_null_value_is_a_valid_value(self) -> None:
         ok, values, _ = self.call(SET_PARAM, {"name": "k", "value": None})

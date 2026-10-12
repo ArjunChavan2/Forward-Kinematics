@@ -164,6 +164,13 @@ class LinkTransformsTest(FkTestCase):
         self.assertVecAlmostEqual(translation(poses["b"]), [0, 1, 0])
         self.assertVecAlmostEqual(translation(poses["c"]), [0, 1, 1])
 
+    def test_loop_in_edges_terminates(self) -> None:
+        # Wire /tf data could hold a loop beside the root; every link still gets exactly one pose.
+        up = make_transform(rpy_to_matrix(0, 0, 0), [0, 0, 1])
+        poses = fk.link_transforms("a", [("a", "b", up), ("b", "c", up), ("c", "b", up)], fk.identity_pose())
+        self.assertVecAlmostEqual(translation(poses["b"]), [0, 0, 1])
+        self.assertVecAlmostEqual(translation(poses["c"]), [0, 0, 2])
+
     def test_no_edges_gives_only_the_root(self) -> None:
         poses = fk.link_transforms("only", [], fk.identity_pose())
         self.assertEqual(list(poses), ["only"])

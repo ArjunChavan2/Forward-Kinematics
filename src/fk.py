@@ -57,6 +57,8 @@ def link_transforms(
     while stack:
         link = stack.pop()
         for child, T in family.get(link, []):
+            if child in world:  # a loop in wire /tf data; revisiting would never terminate
+                continue
             stack.append(child)
             world[child] = matmul(world[link], T)
     

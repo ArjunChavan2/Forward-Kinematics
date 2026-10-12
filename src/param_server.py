@@ -23,9 +23,7 @@ class ParamStore:
         name = args.get("name")
         if not isinstance(name, str):
             return False, {}, "name must be a string"
-        if "value" not in args:
-            return False, {}, "missing value"
-        self._values[name] = args["value"]
+        self._values[name] = args.get("value")  # FK_API: a missing value stores null
         self._versions[name] = self._versions.get(name, 0) + 1
         return True, {"version": self._versions[name]}, ""
 
