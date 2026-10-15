@@ -1,0 +1,76 @@
+<?xml version="1.0"?>
+<!-- Demo robot for make demo: a pedestal and three links. URDF has no ball joint, so each of the three
+     joints is three revolutes at one point (yaw about z, pitch about y, roll about x) joined by
+     zero-length links: 3 rotational degrees of freedom per joint, 9 in all. -->
+<robot name="three_link_arm">
+  <link name="base_link">
+    <visual><origin xyz="0 0 0.05"/><geometry><cylinder radius="0.14" length="0.1"/></geometry></visual>
+  </link>
+  <link name="link1">
+    <visual><origin xyz="0 0 0.2"/><geometry><cylinder radius="0.05" length="0.4"/></geometry></visual>
+  </link>
+  <link name="link2">
+    <visual><origin xyz="0 0 0.175"/><geometry><box size="0.07 0.07 0.35"/></geometry></visual>
+  </link>
+  <link name="link3">
+    <visual><origin xyz="0 0 0.1"/><geometry><box size="0.05 0.05 0.2"/></geometry></visual>
+  </link>
+  <link name="tool">
+    <visual><geometry><sphere radius="0.035"/></geometry></visual>
+  </link>
+  <link name="base_yaw_link"/>
+  <link name="base_pitch_link"/>
+  <joint name="base_yaw" type="revolute">
+    <parent link="base_link"/><child link="base_yaw_link"/>
+    <origin xyz="0 0 0.1"/><axis xyz="0 0 1"/>
+    <limit lower="-3.14" upper="3.14" effort="10" velocity="1"/>
+  </joint>
+  <joint name="base_pitch" type="revolute">
+    <parent link="base_yaw_link"/><child link="base_pitch_link"/>
+    <origin xyz="0 0 0"/><axis xyz="0 1 0"/>
+    <limit lower="-1.6" upper="1.6" effort="10" velocity="1"/>
+  </joint>
+  <joint name="base_roll" type="revolute">
+    <parent link="base_pitch_link"/><child link="link1"/>
+    <origin xyz="0 0 0"/><axis xyz="1 0 0"/>
+    <limit lower="-1.6" upper="1.6" effort="10" velocity="1"/>
+  </joint>
+  <link name="shoulder_yaw_link"/>
+  <link name="shoulder_pitch_link"/>
+  <joint name="shoulder_yaw" type="revolute">
+    <parent link="link1"/><child link="shoulder_yaw_link"/>
+    <origin xyz="0 0 0.4"/><axis xyz="0 0 1"/>
+    <limit lower="-3.14" upper="3.14" effort="10" velocity="1"/>
+  </joint>
+  <joint name="shoulder_pitch" type="revolute">
+    <parent link="shoulder_yaw_link"/><child link="shoulder_pitch_link"/>
+    <origin xyz="0 0 0"/><axis xyz="0 1 0"/>
+    <limit lower="-1.6" upper="1.6" effort="10" velocity="1"/>
+  </joint>
+  <joint name="shoulder_roll" type="revolute">
+    <parent link="shoulder_pitch_link"/><child link="link2"/>
+    <origin xyz="0 0 0"/><axis xyz="1 0 0"/>
+    <limit lower="-1.6" upper="1.6" effort="10" velocity="1"/>
+  </joint>
+  <link name="elbow_yaw_link"/>
+  <link name="elbow_pitch_link"/>
+  <joint name="elbow_yaw" type="revolute">
+    <parent link="link2"/><child link="elbow_yaw_link"/>
+    <origin xyz="0 0 0.35"/><axis xyz="0 0 1"/>
+    <limit lower="-3.14" upper="3.14" effort="10" velocity="1"/>
+  </joint>
+  <joint name="elbow_pitch" type="revolute">
+    <parent link="elbow_yaw_link"/><child link="elbow_pitch_link"/>
+    <origin xyz="0 0 0"/><axis xyz="0 1 0"/>
+    <limit lower="-2.2" upper="2.2" effort="10" velocity="1"/>
+  </joint>
+  <joint name="elbow_roll" type="revolute">
+    <parent link="elbow_pitch_link"/><child link="link3"/>
+    <origin xyz="0 0 0"/><axis xyz="1 0 0"/>
+    <limit lower="-1.6" upper="1.6" effort="10" velocity="1"/>
+  </joint>
+  <joint name="tool_mount" type="fixed">
+    <parent link="link3"/><child link="tool"/>
+    <origin xyz="0 0 0.2"/>
+  </joint>
+</robot>

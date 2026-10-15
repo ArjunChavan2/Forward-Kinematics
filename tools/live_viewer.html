@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Live FK viewer</title>
+<style>
+  :root { --bg: #15171b; --panel: rgba(28, 31, 37, 0.92); --text: #e8eaed; --muted: #9aa0a6; --accent: #ff8a3d; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, system-ui, sans-serif; background: var(--bg); color: var(--text); overflow: hidden; }
+  canvas { display: block; }
+  #overlay { position: absolute; top: 0; left: 0; padding: 0.75rem 1rem; font-size: 0.85rem; pointer-events: none; }
+  #overlay h1 { font-size: 1rem; margin: 0 0 0.25rem; }
+  #overlay .note { color: var(--muted); }
+  #panel { position: absolute; top: 0; right: 0; width: 300px; max-width: 100vw; height: 100vh; overflow-y: auto;
+           background: var(--panel); padding: 0.9rem 1rem 2rem; font-size: 0.8rem; }
+  #panel h2 { font-size: 0.9rem; margin: 0 0 0.6rem; }
+  .controls { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.9rem; flex-wrap: wrap; }
+  button { background: #2c3038; color: var(--text); border: 1px solid #444a54; border-radius: 6px; padding: 0.35rem 0.7rem;
+           font: inherit; cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  label.toggle { display: flex; gap: 0.35rem; align-items: center; cursor: pointer; }
+  .joint { margin-bottom: 0.65rem; }
+  .joint .row { display: flex; justify-content: space-between; color: var(--muted); }
+  .joint .row b { color: var(--text); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .joint input { width: 100%; accent-color: var(--accent); margin: 0.2rem 0 0; }
+  #hide { position: absolute; top: 0.6rem; right: 0.6rem; }
+  @media (max-width: 640px) { #panel { height: 45vh; top: auto; bottom: 0; width: 100vw; } }
+</style>
+</head>
+<body>
+<div id="overlay">
+  <h1>Live FK viewer</h1>
+  <div id="state">waiting for /xform_world&hellip;</div>
+  <div class="note">every link pose from /xform_world &mdash; drag to orbit, scroll to zoom</div>
+</div>
+<div id="panel">
+  <h2>Joints</h2>
+  <div class="controls">
+    <label class="toggle"><input type="checkbox" id="running"> Run choreography</label>
+    <button id="reset" title="Every joint to the middle of its limits">Home</button>
+  </div>
+  <div id="sliders"></div>
+</div>
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.module.js" } }
+</script>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "https://cdn.jsdelivr.net/npm/three@0.149.0/examples/jsm/controls/OrbitControls.js";
+
+// ---- scene -------------------------------------------------------------------------------------------
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x15171b);
+scene.fog = new THREE.Fog(0x15171b, 6, 14);
+const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.01, 100);
+camera.position.set(1.3, 1.0, 1.4);
+const renderer = new THREE.WebGLRenderer({antialias: true});
+renderer.setPixelRatio(devicePixelRatio);
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputEncoding = THREE.sRGBEncoding;
+document.body.appendChild(renderer.domElement);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 0.45, 0);
+controls.enableDamping = true;
+
+scene.add(new THREE.HemisphereLight(0xdfe8ff, 0x30281f, 0.75));
+const sun = new THREE.DirectionalLight(0xffffff, 0.9);
+sun.position.set(2.5, 4, 1.5);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, {left: -2, right: 2, top: 2, bottom: -2, near: 0.5, far: 10});
+scene.add(sun);
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(30, 30), new THREE.MeshStandardMaterial({color: 0x23262c, roughness: 1}));
+floor.rotation.x = -Math.PI / 2;
+floor.receiveShadow = true;
+scene.add(floor);
+const grid = new THREE.GridHelper(30, 60, 0x3a3f47, 0x2b2f36);
+grid.position.y = 0.001;
+scene.add(grid);
+
+// global_frame is z-up; three.js is y-up. The correction lives here in the viewer, never in /xform_world.
+const world = new THREE.Group();
+world.rotation.x = -Math.PI / 2;
+scene.add(world);
+
+const shell = new THREE.MeshStandardMaterial({color: 0xdfe3e8, roughness: 0.45, metalness: 0.1});
+const dark = new THREE.MeshStandardMaterial({color: 0x3b4049, roughness: 0.6, metalness: 0.2});
+const accent = new THREE.MeshStandardMaterial({color: 0xff8a3d, roughness: 0.4, metalness: 0.1});
+const Y = new THREE.Vector3(0, 1, 0);
+
+function mesh(geometry, material) {
+  const m = new THREE.Mesh(geometry, material);
+  m.castShadow = m.receiveShadow = true;
+  return m;
+}
+
+// A URDF box / cylinder / sphere visual, placed by its origin (rpy is Rz·Ry·Rx = three.js Euler order "ZYX").
+function primitive(v) {
+  let m;
+  if (v.type === "box") m = mesh(new THREE.BoxGeometry(...v.size), shell);
+  else if (v.type === "sphere") m = mesh(new THREE.SphereGeometry(v.size[0], 24, 16), shell);
+  else {
+    const g = new THREE.CylinderGeometry(v.size[0], v.size[0], v.size[1], 32);
+    g.rotateX(Math.PI / 2);  // URDF cylinders run along z, three.js ones along y
+    m = mesh(g, shell);
+  }
+  m.position.set(...v.xyz);
+  m.rotation.set(v.rpy[0], v.rpy[1], v.rpy[2], "ZYX");
+  return m;
+}
+
+// A rounded limb from this link's origin to a child joint's origin (fixed in this link's frame).
+function limb(xyz, radius) {
+  const to = new THREE.Vector3(...xyz), length = to.length();
+  const r = radius ?? THREE.MathUtils.clamp(0.16 * length, 0.022, 0.06);
+  const m = mesh(new THREE.CapsuleGeometry(r, Math.max(length - r, 0.001), 6, 16), shell);
+  m.position.copy(to).multiplyScalar(0.5);
+  m.quaternion.setFromUnitVectors(Y, to.clone().normalize());
+  return m;
+}
+
+// ---- robot -------------------------------------------------------------------------------------------
+let links = {}, linkKey = "", loading = false, sliders = {};
+
+function buildBody(robot) {
+  world.clear();
+  links = {};
+  for (const name of robot.links) {
+    const obj = new THREE.Object3D();
+    obj.matrixAutoUpdate = false;
+    obj.visible = false;  // until its first /xform_world pose
+    world.add(obj);
+    links[name] = obj;
+  }
+  for (const [name, v] of Object.entries(robot.visuals)) links[name]?.add(primitive(v));
+  for (const j of robot.joints) {
+    const parent = links[j.parent], child = links[j.child];
+    if (!robot.visuals[j.parent] && Math.hypot(...j.xyz) > 0.02) parent.add(limb(j.xyz));
+    if (j.type === "prismatic" && j.upper > 0.02) {  // a sleeve back along the axis covers the slide's stroke
+      const axis = new THREE.Vector3(...j.axis).normalize();
+      child.add(limb(axis.multiplyScalar(-j.upper).toArray(), 0.07));
+    }
+    if (j.type !== "fixed") {  // a joint hub on the child, oriented by the child's own frame
+      child.add(mesh(new THREE.SphereGeometry(j.type === "prismatic" ? 0.03 : 0.042, 24, 16),
+                     j.type === "prismatic" ? dark : accent));
+    }
+  }
+  // A base for the root, sized to reach its children (when the URDF gives it no shape).
+  const fromRoot = robot.joints.filter(j => j.parent === robot.root);
+  if (!robot.visuals[robot.root] && fromRoot.length) {
+    const radius = Math.max(0.12, ...fromRoot.map(j => Math.hypot(j.xyz[0], j.xyz[1]) + 0.08));
+    const height = THREE.MathUtils.clamp(0.6 * Math.max(...fromRoot.map(j => j.xyz[2])), 0.04, 0.3);
+    const g = new THREE.CylinderGeometry(radius, radius, height, 48);
+    g.rotateX(Math.PI / 2);
+    const base = mesh(g, dark);
+    base.position.z = height / 2;
+    links[robot.root].add(base);
+  }
+}
+
+// ---- sliders -----------------------------------------------------------------------------------------
+let pending = {}, timer = null, needSync = true, touchedAt = 0;
+function sendSetpoints() {
+  timer = null;
+  const name = Object.keys(pending), position = Object.values(pending);
+  pending = {};
+  if (name.length) post("/setpoint", {name, position});
+}
+function post(path, body) {
+  return fetch(path, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)})
+    .then(r => r.json()).catch(() => ({}));
+}
+
+function buildSliders(robot) {
+  const box = document.getElementById("sliders");
+  box.replaceChildren();
+  sliders = {};
+  needSync = true;  // match the robot's pose once
+  for (const j of robot.joints.filter(j => j.type !== "fixed")) {
+    const div = document.createElement("div");
+    div.className = "joint";
+    const unit = j.type === "prismatic" ? " m" : " rad";
+    div.innerHTML = `<div class="row"><b title="${j.name}">${j.name}</b><span>0${unit}</span></div>
+      <input type="range" min="${j.lower}" max="${j.upper}" step="${(j.upper - j.lower) / 1000}" value="0"
+             aria-label="${j.name}">`;
+    const input = div.querySelector("input"), readout = div.querySelector("span");
+    const s = {input, readout, unit, held: false};
+    input.addEventListener("pointerdown", () => { s.held = true; });
+    addEventListener("pointerup", () => { s.held = false; });
+    input.addEventListener("input", () => {
+      readout.textContent = Number(input.value).toFixed(3) + unit;
+      pending[j.name] = Number(input.value);
+      touchedAt = performance.now();
+      document.getElementById("running").checked = false;
+      if (!timer) timer = setTimeout(sendSetpoints, 50);
+    });
+    sliders[j.name] = s;
+    box.appendChild(div);
+  }
+}
+
+function onJointStates(msg) {
+  // While the choreography runs, sliders follow the robot. Under manual control they hold the setpoint.
+  // A status sent before the slider stopped the choreography may still say running: skip it.
+  if (!needSync && (!fsm || !fsm.running || performance.now() - touchedAt < 1000)) return;
+  needSync = false;
+  msg.name.forEach((name, i) => {
+    const s = sliders[name];
+    if (!s || s.held) return;
+    s.input.value = msg.position[i];
+    s.readout.textContent = msg.position[i].toFixed(3) + s.unit;
+  });
+}
+
+document.getElementById("running").addEventListener("change", e => post("/running", {data: e.target.checked}));
+document.getElementById("reset").addEventListener("click", () => {
+  document.getElementById("running").checked = false;
+  post("/reset", {});
+});
+
+// ---- live data ---------------------------------------------------------------------------------------
+async function onXform(msg) {
+  if (loading) return;  // drop frames while a new robot is being built
+  const key = msg.transforms.map(e => e.child_frame_id).sort().join(",");
+  if (key !== linkKey) {  // a new robot was loaded
+    loading = true;
+    try {
+      const robot = await (await fetch("/robot")).json();
+      buildBody(robot);
+      buildSliders(robot);
+      linkKey = key;
+    } finally { loading = false; }
+  }
+  for (const e of msg.transforms) {
+    const obj = links[e.child_frame_id];
+    if (obj) { obj.matrix.fromArray(e.matrix); obj.matrixWorldNeedsUpdate = true; obj.visible = true; }  // column-major
+  }
+}
+
+let fsm = null;
+const events = new EventSource("/stream");
+events.addEventListener("xform", e => onXform(JSON.parse(e.data)));
+events.addEventListener("joints", e => onJointStates(JSON.parse(e.data)));
+events.addEventListener("fsm", e => {
+  fsm = JSON.parse(e.data);
+  const box = document.getElementById("running");
+  if (document.activeElement !== box && performance.now() - touchedAt > 1000) box.checked = fsm.running;
+});
+setInterval(() => {
+  const n = Object.keys(links).length;
+  document.getElementById("state").textContent = !fsm ? `${n} links | no FSM status (is make demo running?)`
+    : fsm.running ? `${n} links | choreography: ${fsm.current_state} (${fsm.time_in_state.toFixed(1)} s)`
+    : `${n} links | manual control`;
+}, 100);
+
+addEventListener("resize", () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+(function animate() { requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera); })();
+</script>
+</body>
+</html>

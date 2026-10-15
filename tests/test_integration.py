@@ -325,6 +325,38 @@ class DemoWireTest(ServerTestCase):
         msg = self.recv("/tf", lambda m: abs(link1_angle(m) - 0.5) < 1e-6, timeout=5)
         self.assertNotEqual(msg["transforms"][0]["header"]["stamp"], {"sec": 0, "nanosec": 0})
 
+    def test_live_viewer_slider_moves_the_joint_and_stops_the_choreography(self) -> None:
+        sys.path.insert(0, os.path.join(SRC, "..", "tools"))
+        import threading
+        import urllib.request
+        from http.server import ThreadingHTTPServer
+        import live_viewer
+
+        server = ThreadingHTTPServer(("127.0.0.1", 0), live_viewer.Handler)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        self.addCleanup(server.shutdown)
+        base = f"http://127.0.0.1:{server.server_port}"
+
+        def post(path, body):
+            req = urllib.request.Request(base + path, json.dumps(body).encode(), {"Content-Type": "application/json"})
+            return json.loads(urllib.request.urlopen(req, timeout=5).read())
+
+        self.client.subscribe("/tf")
+        self.load_robot(CHAIN_URDF.replace('<link name="link1"/>', '<link name="link1"><visual><geometry>'
+                                           '<box size="0.1 0.2 0.3"/></geometry></visual></link>'))
+        self.recv("/tf")
+        robot = json.loads(urllib.request.urlopen(base + "/robot", timeout=5).read())
+        self.assertEqual([(j["name"], j["lower"], j["upper"]) for j in robot["joints"] if j["type"] != "fixed"],
+                         [("j1", -3.0, 3.0), ("j3", -1.0, 1.0)])
+        self.assertEqual(robot["visuals"], {"link1": {"xyz": [0.0, 0.0, 0.0], "rpy": [0.0, 0.0, 0.0],
+                                                      "type": "box", "size": [0.1, 0.2, 0.3]}})
+        self.client.call_service("/fsm/set_running", {"data": True})
+        post("/setpoint", {"name": ["j1"], "position": [0.5]})
+        self.assertEqual(self.client.call_service("/fsm/set_running", {})["values"], {"running": False})
+        self.recv("/tf", lambda m: abs(2 * math.atan2(self.tf_by_child(m)["link1"]["transform"]["rotation"]["z"],
+                                                      self.tf_by_child(m)["link1"]["transform"]["rotation"]["w"])
+                                       - 0.5) < 1e-6, timeout=5)
+
 
 if __name__ == "__main__":
     unittest.main()

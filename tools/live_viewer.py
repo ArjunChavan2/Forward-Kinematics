@@ -1,22 +1,28 @@
-"""Live 3D viewer for `make demo`: draws every link from /xform_world as the robot moves.
+"""Live 3D viewer for `make demo`: draws the robot from /xform_world as it moves, with a slider per joint.
 
 Not part of the graded submission. A browser cannot open the gateway's raw TCP socket, so this serves the
-page and bridges the gateway to it: a background thread subscribes /xform_world and /fsm/status, and the
-page reads the latest of each through Server-Sent Events. Link shapes come from robot_description (a
-sphere + axes per link, a line per joint); every pose comes from /xform_world.
+page (live_viewer.html) and bridges the gateway to it:
+- a background thread subscribes /xform_world, /joint_states, and /fsm/status, and the page reads the
+  latest of each through Server-Sent Events;
+- the page's sliders POST setpoints here, which go out on /joint_trajectory (the choreography is stopped
+  first, so it does not fight the sliders).
+Every link pose comes from /xform_world. robot_description only supplies shapes, joint limits, and
+joint origins (where each link's body reaches toward its children).
 
 Usage (with `make demo` running):
-    python3 tools/live_viewer.py                                     # view whatever robot is loaded
-    python3 tools/live_viewer.py robot.urdf fsm/fetch_wave.json      # load a robot + choreography first
-    python3 tools/live_viewer.py robot.urdf fsm/fetch_wave.json 8804 # on another port (default 8803)
+    python3 tools/live_viewer.py                            # load the three-link arm + its choreography
+    python3 tools/live_viewer.py robot.urdf fsm/table.json  # load another robot + choreography
+    python3 tools/live_viewer.py 8804                       # on another port (default 8803)
 """
 from __future__ import annotations
 
 import json
+import math
 import os
 import sys
 import threading
 import time
+import xml.etree.ElementTree as ET
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -28,16 +34,19 @@ from urdf import parse_urdf  # noqa: E402
 
 HOST = "127.0.0.1"
 DEFAULT_PORT = 8803
+DEFAULT_ROBOT = os.path.join(HERE, "..", "robots", "three_link_arm.urdf")
+DEFAULT_FSM = os.path.join(HERE, "..", "fsm", "three_link_wave.json")
+TOPICS = {"/xform_world": "xform", "/joint_states": "joints", "/fsm/status": "fsm"}
 latest: dict[str, str] = {}  # topic -> latest msg as JSON text
 
 
 def bridge() -> None:
-    """Keep the latest /xform_world and /fsm/status; reconnect if the gateway restarts."""
+    """Keep the latest message of each topic; reconnect if the gateway restarts."""
     while True:
         try:
             with Client() as client:
-                client.subscribe("/xform_world")
-                client.subscribe("/fsm/status")
+                for topic in TOPICS:
+                    client.subscribe(topic)
                 while True:
                     m = client.recv_line(timeout=30)
                     if m.get("op") == "publish":
@@ -46,140 +55,106 @@ def bridge() -> None:
             time.sleep(0.5)
 
 
+class Control:
+    """One gateway connection for the sliders, shared by the HTTP threads."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._client: Client | None = None
+
+    def _call(self, fn):
+        with self._lock:
+            for attempt in range(2):  # reconnect once if the gateway restarted
+                try:
+                    if self._client is None:
+                        self._client = Client()
+                        self._client.advertise("/joint_trajectory")
+                    return fn(self._client)
+                except OSError:
+                    self._client = None
+                    if attempt:
+                        raise
+
+    def service(self, name: str, args: dict) -> dict:
+        return self._call(lambda c: c.call_service(name, args))
+
+    def setpoint(self, names: list, positions: list) -> None:
+        self.service("/fsm/set_running", {"data": False})
+        self._call(lambda c: c.publish("/joint_trajectory", {
+            "joint_names": names,
+            "points": [{"positions": positions, "velocities": [], "accelerations": [],
+                        "time_from_start": {"sec": 0, "nanosec": 0}}]}))
+
+
+control = Control()
+
+
+def _three(text: str | None) -> list[float]:
+    values = [float(v) for v in (text or "0 0 0").split()]
+    return values if len(values) == 3 and all(math.isfinite(v) for v in values) else [0.0, 0.0, 0.0]
+
+
+def first_visuals(text: str) -> dict:
+    """{link: {"xyz", "rpy", "type", "size"}} for each link whose first <visual> is a box, cylinder, or sphere.
+    Meshes are skipped (their files are not available here); those links get a drawn body instead."""
+    visuals = {}
+    for link in ET.fromstring(text).findall("link"):
+        visual = link.find("visual")
+        geometry = visual.find("geometry") if visual is not None else None
+        shape = geometry[0] if geometry is not None and len(geometry) else None
+        if shape is None or shape.tag not in ("box", "cylinder", "sphere"):
+            continue
+        origin = visual.find("origin")
+        try:
+            size = (_three(shape.get("size")) if shape.tag == "box"
+                    else [float(shape.get("radius")), float(shape.get("length", 0))])
+        except (TypeError, ValueError):
+            continue
+        visuals[link.get("name")] = {"xyz": _three(origin.get("xyz") if origin is not None else None),
+                                     "rpy": _three(origin.get("rpy") if origin is not None else None),
+                                     "type": shape.tag, "size": size}
+    return visuals
+
+
 def robot_json() -> bytes:
-    with Client() as client:
-        reply = client.call_service("/param_server/get_param", {"name": "robot_description"})
+    reply = control.service("/param_server/get_param", {"name": "robot_description"})
+    text = reply["values"].get("value")
     try:
-        model = parse_urdf(reply["values"]["value"])
-    except (ValueError, TypeError, KeyError):
-        return b'{"links": [], "bones": []}'
-    return json.dumps({"links": [link.name for link in model.links],
-                       "bones": [[j.parent, j.child, j.joint_type] for j in model.joints]}).encode()
-
-
-PAGE = """<!doctype html>
-<html>
-<head>
-<meta charset="utf-8">
-<title>Live FK viewer</title>
-<style>
-  body { margin: 0; font-family: -apple-system, system-ui, sans-serif; background: #111; color: #eee; }
-  #overlay { position: absolute; top: 0; left: 0; padding: 0.75rem 1rem; font-size: 0.85rem; }
-  #overlay h1 { font-size: 1rem; margin: 0 0 0.25rem; }
-  #overlay .note { color: #999; }
-  #credit { position: absolute; bottom: 0; left: 0; padding: 0.5rem 1rem; font-size: 0.75rem; color: #888; }
-  canvas { display: block; }
-</style>
-</head>
-<body>
-<div id="overlay">
-  <h1>Live FK viewer</h1>
-  <div id="state">waiting for /xform_world&hellip;</div>
-  <div class="note">every link drawn from /xform_world &mdash; drag to orbit, scroll to zoom</div>
-</div>
-<div id="credit"></div>
-<script type="importmap">
-{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.module.js" } }
-</script>
-<script type="module">
-import * as THREE from "three";
-import { OrbitControls } from "https://cdn.jsdelivr.net/npm/three@0.149.0/examples/jsm/controls/OrbitControls.js";
-
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x111111);
-const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.01, 100);
-camera.position.set(2.2, 1.6, 2.2);
-const renderer = new THREE.WebGLRenderer({antialias: true});
-renderer.setSize(innerWidth, innerHeight);
-document.body.appendChild(renderer.domElement);
-const controls = new OrbitControls(camera, renderer.domElement);
-controls.target.set(0, 0.6, 0);
-
-scene.add(new THREE.GridHelper(4, 40, 0x444444, 0x2a2a2a));
-scene.add(new THREE.AmbientLight(0xffffff, 0.8));
-const sun = new THREE.DirectionalLight(0xffffff, 0.6);
-sun.position.set(1, 2, 1);
-scene.add(sun);
-
-// global_frame is z-up; three.js is y-up. The correction lives here in the viewer, never in /xform_world.
-const world = new THREE.Group();
-world.rotation.x = -Math.PI / 2;
-scene.add(world);
-
-const boneColors = {revolute: 0xffaa00, continuous: 0xffaa00, prismatic: 0x55ff55, fixed: 0x888888};
-let links = {}, bones = [], linkKey = "";
-
-async function loadRobot() {
-  const robot = await (await fetch("/robot")).json();
-  world.clear();
-  links = {};
-  for (const name of robot.links) {
-    const obj = new THREE.Object3D();
-    obj.matrixAutoUpdate = false;
-    obj.add(new THREE.Mesh(new THREE.SphereGeometry(0.025, 12, 12),
-                           new THREE.MeshStandardMaterial({color: 0x4da6ff})));
-    obj.add(new THREE.AxesHelper(0.07));
-    world.add(obj);
-    links[name] = obj;
-  }
-  bones = robot.bones.filter(([p, c]) => links[p] && links[c]).map(([parent, child, type]) => {
-    const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]),
-                                new THREE.LineBasicMaterial({color: boneColors[type] || 0xffffff}));
-    world.add(line);
-    return {parent, child, line};
-  });
-  document.getElementById("credit").textContent = robot.links.includes("shoulder_pan_link")
-    ? "Fetch robot description \\u00a9 Fetch Robotics, Inc., CC BY-NC-SA 4.0." : "";
-}
-
-const a = new THREE.Vector3(), b = new THREE.Vector3();
-let loading = false;
-async function onXform(msg) {
-  if (loading) return;  // drop frames while a new robot's links are being built
-  const key = msg.transforms.map(e => e.child_frame_id).sort().join(",");
-  if (key !== linkKey) {  // a new robot was loaded
-    loading = true;
-    try { await loadRobot(); linkKey = key; } finally { loading = false; }
-  }
-  for (const e of msg.transforms) {
-    const obj = links[e.child_frame_id];
-    if (obj) { obj.matrix.fromArray(e.matrix); obj.matrixWorldNeedsUpdate = true; }  // column-major, as sent
-  }
-  for (const {parent, child, line} of bones) {
-    a.setFromMatrixPosition(links[parent].matrix);
-    b.setFromMatrixPosition(links[child].matrix);
-    line.geometry.setFromPoints([a, b]);
-  }
-}
-
-let fsm = null;
-const events = new EventSource("/stream");
-events.addEventListener("xform", e => onXform(JSON.parse(e.data)));
-events.addEventListener("fsm", e => { fsm = JSON.parse(e.data); });
-setInterval(() => {
-  const n = Object.keys(links).length;
-  document.getElementById("state").textContent = fsm
-    ? `${n} links | state: ${fsm.current_state} (${fsm.time_in_state.toFixed(1)} s) | ${fsm.running ? "running" : "stopped"}`
-    : `${n} links | no FSM status (is make demo running?)`;
-}, 100);
-
-addEventListener("resize", () => {
-  camera.aspect = innerWidth / innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(innerWidth, innerHeight);
-});
-(function animate() { requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera); })();
-</script>
-</body>
-</html>
-""".encode("utf-8")
+        model = parse_urdf(text)
+    except (ValueError, TypeError):
+        return b'{"root": null, "links": [], "joints": [], "visuals": {}}'
+    joints = [{"name": j.name, "type": j.joint_type, "parent": j.parent, "child": j.child, "xyz": list(j.origin_xyz), "axis": list(j.axis),
+               "lower": j.limit.lower if j.limit else -math.pi, "upper": j.limit.upper if j.limit else math.pi}
+              for j in model.joints]
+    return json.dumps({"root": model.root_link, "links": [link.name for link in model.links],
+                       "joints": joints, "visuals": first_visuals(text)}).encode()
 
 
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:  # noqa: N802
         if self.path == "/stream":
             return self.stream()
-        body, kind = (robot_json(), "application/json") if self.path == "/robot" else (PAGE, "text/html; charset=utf-8")
+        if self.path == "/robot":
+            return self.reply(robot_json(), "application/json")
+        with open(os.path.join(HERE, "live_viewer.html"), "rb") as f:
+            self.reply(f.read(), "text/html; charset=utf-8")
+
+    def do_POST(self) -> None:  # noqa: N802
+        body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))) or b"{}")
+        if self.path == "/setpoint":  # {"name": [...], "position": [...]}
+            control.setpoint(body["name"], [float(p) for p in body["position"]])
+            result = {}
+        elif self.path == "/running":  # {"data": true|false}
+            result = control.service("/fsm/set_running", {"data": bool(body.get("data"))})
+        elif self.path == "/reset":
+            control.service("/fsm/set_running", {"data": False})
+            result = control.service("/joint_state_publisher/reset", {})
+        else:
+            self.send_error(404)
+            return
+        self.reply(json.dumps(result).encode(), "application/json")
+
+    def reply(self, body: bytes, kind: str) -> None:
         self.send_response(200)
         self.send_header("Content-Type", kind)
         self.send_header("Content-Length", str(len(body)))
@@ -194,7 +169,7 @@ class Handler(BaseHTTPRequestHandler):
         sent: dict[str, str] = {}
         try:
             while True:
-                for topic, event in (("/xform_world", "xform"), ("/fsm/status", "fsm")):
+                for topic, event in TOPICS.items():
                     data = latest.get(topic)
                     if data is not None and data is not sent.get(topic):
                         self.wfile.write(f"event: {event}\ndata: {data}\n\n".encode())
@@ -211,20 +186,19 @@ class Handler(BaseHTTPRequestHandler):
 def main() -> None:
     args = sys.argv[1:]
     port = int(args.pop()) if args and args[-1].isdigit() else DEFAULT_PORT
-    urdf_path, fsm_path = (args + [None, None])[:2]
-    with Client() as client:
-        if urdf_path:
-            with open(urdf_path, encoding="utf-8") as f:
-                print("set robot_description:", client.call_service(
-                    "/param_server/set_param", {"name": "robot_description", "value": f.read()})["result"])
-            time.sleep(0.5)  # let joint_state_publisher pick up the robot before the first setpoint
-        if fsm_path:
-            with open(fsm_path, encoding="utf-8") as f:
-                reply = client.call_service("/fsm/update_logic", json.load(f))
-            print("update_logic:", reply["result"], reply["status"] or reply["values"])
+    urdf_path, fsm_path = (args + [None, None])[:2] if args else (DEFAULT_ROBOT, DEFAULT_FSM)
+    if urdf_path:
+        with open(urdf_path, encoding="utf-8") as f:
+            reply = control.service("/param_server/set_param", {"name": "robot_description", "value": f.read()})
+        print("set robot_description:", reply["result"], flush=True)
+        time.sleep(0.5)  # let joint_state_publisher pick up the robot before the first setpoint
+    if fsm_path:
+        with open(fsm_path, encoding="utf-8") as f:
+            reply = control.service("/fsm/update_logic", json.load(f))
+        print("update_logic:", reply["result"], reply["status"] or reply["values"], flush=True)
     threading.Thread(target=bridge, daemon=True).start()
     server = ThreadingHTTPServer((HOST, port), Handler)
-    print(f"Serving at http://{HOST}:{port}/  (Ctrl-C to stop)")
+    print(f"Serving at http://{HOST}:{port}/  (Ctrl-C to stop)", flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
