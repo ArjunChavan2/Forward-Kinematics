@@ -101,7 +101,7 @@
   <div class="note">every link pose from /xform_world &mdash; drag to orbit, scroll to zoom</div>
 </div>
 <div id="fsm" hidden>
-  <h2>State machine <span class="ctl"><span id="fsm-mode"></span><button id="running">Play</button></span></h2>
+  <h2>State machine <span class="ctl"><span id="fsm-mode"></span><label title="playback speed of the whole choreography">Speed <input type="range" id="speed" min="0.25" max="3" step="0.05" value="1"> <output id="speed-out" for="speed">1.00×</output></label><button id="running">Play</button></span></h2>
   <svg id="fsm-graph" role="img" aria-label="Choreography state machine"></svg>
   <div id="fsm-detail">
     <div class="now"><b id="fsm-now" aria-live="polite"></b> <span id="fsm-next"></span></div>
@@ -899,6 +899,16 @@ ed("save").addEventListener("click", async () => {
 });
 
 loadFsm();
+const speedIn = document.getElementById("speed"), speedOut = document.getElementById("speed-out");
+const showSpeed = reply => {  // the publisher's rate, so a reload or a second page shows the real one
+  const s = reply.values?.speed;
+  if (s) { speedIn.value = s; speedOut.value = `${s.toFixed(2)}×`; }
+};
+speedIn.addEventListener("input", () => {
+  speedOut.value = `${(+speedIn.value).toFixed(2)}×`;
+  post("/speed", {data: +speedIn.value}).then(showSpeed);
+});
+post("/speed", {}).then(showSpeed);
 const events = new EventSource("/stream");
 events.addEventListener("xform", e => onXform(JSON.parse(e.data)));
 events.addEventListener("table", async e => {  // changed elsewhere (another tab, a script)

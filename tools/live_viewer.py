@@ -284,6 +284,8 @@ class Handler(BaseHTTPRequestHandler):
             result = {}
         elif self.path == "/running":  # {"data": true|false}
             result = control.service("/fsm/set_running", {"data": bool(body.get("data"))})
+        elif self.path == "/speed":  # {"data": rate}, or {} to read it: playback rate of every move
+            result = control.service("/joint_state_publisher/set_speed", body)
         elif self.path == "/state":  # {"state": name}: pause the choreography on that state
             control.service("/fsm/set_running", {"data": False})
             result = control.service("/fsm/set_state", {"state": body.get("state")})

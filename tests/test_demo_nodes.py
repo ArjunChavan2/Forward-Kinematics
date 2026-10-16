@@ -3,12 +3,14 @@ import os
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
+import joint_state_publisher  # noqa: E402
 import param_server  # noqa: E402
 from finite_state_machine import FiniteStateMachine  # noqa: E402
-from joint_state_publisher import MAX_ACCEL, MAX_SPEED, JointStatePublisher  # noqa: E402
+from joint_state_publisher import MAX_ACCEL, MAX_SPEED, MOVE_S, JointStatePublisher  # noqa: E402
 from registry import Registry  # noqa: E402
 from test_fk import CHAIN_URDF  # noqa: E402  (j1 revolute [-3, 3], j2 fixed, j3 prismatic [-1, 1])
 from urdf import parse_urdf  # noqa: E402
@@ -29,7 +31,13 @@ def trajectory(names, positions):
 
 
 class JointStatePublisherTest(unittest.TestCase):
+    """The speed/accel servo (USE_QUINTIC off)."""
+    QUINTIC = False
+
     def setUp(self):
+        patcher = mock.patch.object(joint_state_publisher, "USE_QUINTIC", self.QUINTIC)
+        patcher.start()
+        self.addCleanup(patcher.stop)
         self.registry = Registry()
         param_server.register(self.registry)
         self.jsp = JointStatePublisher(self.registry, parse_urdf)
@@ -82,7 +90,64 @@ class JointStatePublisherTest(unittest.TestCase):
         self.assertEqual(self.jsp.setpoints, {"j1": 0.0, "j3": 0.25})
 
 
-TABLE = {"initial_state": "home", "states": [
+class QuinticJointStatePublisherTest(JointStatePublisherTest):
+    """USE_QUINTIC on: every joint follows a MOVE_S-long quintic to its setpoint."""
+    QUINTIC = True
+    test_moves_at_capped_speed_and_clamps_to_limits = None  # servo-only behavior
+    test_keeps_its_speed_when_the_target_changes_mid_move = None
+
+    def run_for(self, seconds, dt=0.01):
+        for _ in range(round(seconds / dt)):
+            self.jsp.step(dt)
+
+    def test_setpoint_that_arrives_before_the_robot_still_applies(self):
+        self.registry.publish("/joint_trajectory", trajectory(["j1"], [0.05]))
+        self.load()
+        self.run_for(MOVE_S)
+        self.assertEqual(self.jsp.positions["j1"], 0.05)
+
+    def test_joints_finish_together_on_time_and_clamped(self):
+        self.load()
+        self.registry.publish("/joint_trajectory", trajectory(["j1", "j3"], [2.0, 5.0]))
+        self.run_for(MOVE_S / 2)  # halfway: each joint is halfway, whatever its distance
+        self.assertAlmostEqual(self.jsp.positions["j1"], 1.0)
+        self.assertAlmostEqual(self.jsp.positions["j3"], 0.5)  # j3's goal is its upper limit, 1
+        self.run_for(MOVE_S / 2)
+        self.assertEqual(self.jsp.positions, {"j1": 2.0, "j3": 1.0})
+        self.assertEqual(self.jsp.velocities, {"j1": 0.0, "j3": 0.0})
+
+    def test_resent_setpoint_does_not_restart_the_move(self):
+        self.load()
+        self.registry.publish("/joint_trajectory", trajectory(["j1"], [2.0]))
+        self.run_for(MOVE_S / 2)
+        self.registry.publish("/joint_trajectory", trajectory(["j1"], [2.0]))
+        self.run_for(MOVE_S / 2)
+        self.assertEqual(self.jsp.positions["j1"], 2.0)
+
+    def test_new_setpoint_mid_move_keeps_the_velocity(self):
+        self.load()
+        self.registry.publish("/joint_trajectory", trajectory(["j1"], [2.0]))
+        self.run_for(MOVE_S / 2)
+        before = self.jsp.velocities["j1"]
+        self.registry.publish("/joint_trajectory", trajectory(["j1"], [-2.0]))
+        self.jsp.step(0.001)
+        self.assertAlmostEqual(self.jsp.velocities["j1"], before, delta=0.05)  # no jump, still heading to +2
+        self.run_for(MOVE_S)
+        self.assertEqual((self.jsp.positions["j1"], self.jsp.velocities["j1"]), (-2.0, 0.0))
+
+    def test_speed_scales_every_move_and_rejects_bad_rates(self):
+        self.load()
+        call = lambda args: self.registry.call_service_sync(joint_state_publisher.SPEED_SERVICE, args)
+        self.assertEqual(call({"data": 2}), (True, {"speed": 2.0}, ""))
+        self.registry.publish("/joint_trajectory", trajectory(["j1"], [2.0]))
+        self.run_for(MOVE_S / 2)  # twice as fast: done in half the time
+        self.assertEqual(self.jsp.positions["j1"], 2.0)
+        for bad in ({"data": 0}, {"data": 99}, {"data": "fast"}, {"data": True}):
+            self.assertFalse(call(bad)[0], bad)
+        self.assertEqual(call({})[1], {"speed": 2.0})  # unchanged, and {} just reads it
+
+
+TABLE ={"initial_state": "home", "states": [
     {"name": "home", "target": {"joint_names": ["j1"], "positions": [0.0]}, "epsilon": 0.02,
      "on_arrival": "to_wave", "transitions": [{"name": "to_wave", "next_state": "wave"}]},
     {"name": "wave", "target": {"joint_names": ["j1"], "positions": [0.8]}, "epsilon": 0.02,
