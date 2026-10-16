@@ -1,0 +1,381 @@
+{
+  "initial_state": "home",
+  "states": [
+    {
+      "name": "home",
+      "target": {
+        "joint_names": [
+          "drive_x",
+          "drive_y",
+          "drive_yaw",
+          "torso_lift",
+          "waist_yaw",
+          "left_shoulder_pitch",
+          "left_shoulder_roll",
+          "left_elbow",
+          "left_wrist",
+          "left_wrist_yaw",
+          "right_shoulder_pitch",
+          "right_shoulder_roll",
+          "right_elbow",
+          "right_wrist",
+          "right_wrist_yaw"
+        ],
+        "positions": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "epsilon": 0.05,
+      "on_arrival": "to_raise",
+      "transitions": [
+        {
+          "name": "to_raise",
+          "next_state": "raise"
+        }
+      ]
+    },
+    {
+      "name": "raise",
+      "target": {
+        "joint_names": [
+          "drive_x",
+          "drive_y",
+          "drive_yaw",
+          "torso_lift",
+          "waist_yaw",
+          "left_shoulder_pitch",
+          "left_shoulder_roll",
+          "left_elbow",
+          "left_wrist",
+          "left_wrist_yaw",
+          "right_shoulder_pitch",
+          "right_shoulder_roll",
+          "right_elbow",
+          "right_wrist",
+          "right_wrist_yaw"
+        ],
+        "positions": [
+          0.0,
+          0.0,
+          0.0,
+          0.12,
+          0.0,
+          -1.2,
+          0.0,
+          -1.7,
+          0.0,
+          0.0,
+          -1.4,
+          0.0,
+          -0.2,
+          0.0,
+          0.0
+        ]
+      },
+      "epsilon": 0.05,
+      "on_arrival": "to_ready",
+      "transitions": [
+        {
+          "name": "to_ready",
+          "next_state": "ready"
+        }
+      ]
+    },
+    {
+      "name": "ready",
+      "target": {
+        "joint_names": [
+          "drive_x",
+          "drive_y",
+          "drive_yaw",
+          "torso_lift",
+          "waist_yaw",
+          "left_shoulder_pitch",
+          "left_shoulder_roll",
+          "left_elbow",
+          "left_wrist",
+          "left_wrist_yaw",
+          "right_shoulder_pitch",
+          "right_shoulder_roll",
+          "right_elbow",
+          "right_wrist",
+          "right_wrist_yaw"
+        ],
+        "positions": [
+          0.0,
+          0.0,
+          0.0,
+          0.12,
+          0.0,
+          -1.2,
+          -0.9,
+          -1.7,
+          0.0,
+          0.0,
+          -1.4,
+          0.0,
+          -0.2,
+          0.0,
+          0.0
+        ]
+      },
+      "epsilon": 0.05,
+      "on_arrival": "to_twist_hand",
+      "transitions": [
+        {
+          "name": "to_twist_hand",
+          "next_state": "twist_hand"
+        }
+      ]
+    },
+    {
+      "name": "twist_hand",
+      "target": {
+        "joint_names": [
+          "drive_x",
+          "drive_y",
+          "drive_yaw",
+          "torso_lift",
+          "waist_yaw",
+          "left_shoulder_pitch",
+          "left_shoulder_roll",
+          "left_elbow",
+          "left_wrist",
+          "left_wrist_yaw",
+          "right_shoulder_pitch",
+          "right_shoulder_roll",
+          "right_elbow",
+          "right_wrist",
+          "right_wrist_yaw"
+        ],
+        "positions": [
+          0.0,
+          0.0,
+          0.0,
+          0.12,
+          0.0,
+          -1.2,
+          -0.9,
+          -1.7,
+          0.0,
+          0.0,
+          -1.4,
+          0.0,
+          -0.2,
+          0.0,
+          1.5708
+        ]
+      },
+      "epsilon": 0.05,
+      "on_arrival": "to_turn_left",
+      "transitions": [
+        {
+          "name": "to_turn_left",
+          "next_state": "turn_left"
+        }
+      ]
+    },
+    {
+      "name": "turn_left",
+      "target": {
+        "joint_names": [
+          "drive_x",
+          "drive_y",
+          "drive_yaw",
+          "torso_lift",
+          "waist_yaw",
+          "left_shoulder_pitch",
+          "left_shoulder_roll",
+          "left_elbow",
+          "left_wrist",
+          "left_wrist_yaw",
+          "right_shoulder_pitch",
+          "right_shoulder_roll",
+          "right_elbow",
+          "right_wrist",
+          "right_wrist_yaw"
+        ],
+        "positions": [
+          0.0,
+          0.0,
+          0.5236,
+          0.12,
+          0.0,
+          -1.2,
+          -0.9,
+          -1.7,
+          0.0,
+          0.0,
+          -1.4,
+          0.0,
+          -0.2,
+          -0.7,
+          1.5708
+        ]
+      },
+      "epsilon": 0.08,
+      "on_arrival": "to_pass_center_1",
+      "transitions": [
+        {
+          "name": "to_pass_center_1",
+          "next_state": "pass_center_1"
+        }
+      ]
+    },
+    {
+      "name": "pass_center_1",
+      "target": {
+        "joint_names": [
+          "drive_x",
+          "drive_y",
+          "drive_yaw",
+          "torso_lift",
+          "waist_yaw",
+          "left_shoulder_pitch",
+          "left_shoulder_roll",
+          "left_elbow",
+          "left_wrist",
+          "left_wrist_yaw",
+          "right_shoulder_pitch",
+          "right_shoulder_roll",
+          "right_elbow",
+          "right_wrist",
+          "right_wrist_yaw"
+        ],
+        "positions": [
+          0.0,
+          0.0,
+          0.0,
+          0.12,
+          0.0,
+          -1.2,
+          -0.9,
+          -1.7,
+          0.0,
+          0.0,
+          -1.4,
+          0.0,
+          -0.2,
+          0.7,
+          1.5708
+        ]
+      },
+      "epsilon": 0.08,
+      "on_arrival": "to_turn_right",
+      "transitions": [
+        {
+          "name": "to_turn_right",
+          "next_state": "turn_right"
+        }
+      ]
+    },
+    {
+      "name": "turn_right",
+      "target": {
+        "joint_names": [
+          "drive_x",
+          "drive_y",
+          "drive_yaw",
+          "torso_lift",
+          "waist_yaw",
+          "left_shoulder_pitch",
+          "left_shoulder_roll",
+          "left_elbow",
+          "left_wrist",
+          "left_wrist_yaw",
+          "right_shoulder_pitch",
+          "right_shoulder_roll",
+          "right_elbow",
+          "right_wrist",
+          "right_wrist_yaw"
+        ],
+        "positions": [
+          0.0,
+          0.0,
+          -0.5236,
+          0.12,
+          0.0,
+          -1.2,
+          -0.9,
+          -1.7,
+          0.0,
+          0.0,
+          -1.4,
+          0.0,
+          -0.2,
+          -0.7,
+          1.5708
+        ]
+      },
+      "epsilon": 0.08,
+      "on_arrival": "to_pass_center_2",
+      "transitions": [
+        {
+          "name": "to_pass_center_2",
+          "next_state": "pass_center_2"
+        }
+      ]
+    },
+    {
+      "name": "pass_center_2",
+      "target": {
+        "joint_names": [
+          "drive_x",
+          "drive_y",
+          "drive_yaw",
+          "torso_lift",
+          "waist_yaw",
+          "left_shoulder_pitch",
+          "left_shoulder_roll",
+          "left_elbow",
+          "left_wrist",
+          "left_wrist_yaw",
+          "right_shoulder_pitch",
+          "right_shoulder_roll",
+          "right_elbow",
+          "right_wrist",
+          "right_wrist_yaw"
+        ],
+        "positions": [
+          0.0,
+          0.0,
+          0.0,
+          0.12,
+          0.0,
+          -1.2,
+          -0.9,
+          -1.7,
+          0.0,
+          0.0,
+          -1.4,
+          0.0,
+          -0.2,
+          0.7,
+          1.5708
+        ]
+      },
+      "epsilon": 0.08,
+      "on_arrival": "to_turn_left",
+      "transitions": [
+        {
+          "name": "to_turn_left",
+          "next_state": "turn_left"
+        }
+      ]
+    }
+  ]
+}

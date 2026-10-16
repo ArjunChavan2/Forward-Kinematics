@@ -18,9 +18,12 @@ TRAJECTORY_TOPIC = "/joint_trajectory"
 JOINT_STATES_TOPIC = "/joint_states"
 RESET_SERVICE = "/joint_state_publisher/reset"
 INTERVAL_S = 0.1
-# The reference servos with gain 50/s, which at 10 Hz is effectively a snap. A speed cap makes motion
-# visible on video instead.
-MAX_SPEED = 1.0  # rad/s or m/s
+# The reference servos with gain 50/s, which at 10 Hz is effectively a snap. Capped speed and acceleration
+# make motion visible on video instead, and smooth: joints speed up, slow down into a target, and keep
+# their speed when a new target arrives mid-move, so a choreography flows from pose to pose.
+MAX_SPEED = 12.0  # rad/s or m/s
+MAX_ACCEL = 60.0  # rad/s^2 or m/s^2
+SUBSTEP_S = 0.01  # integration step inside one publish interval
 
 
 class JointStatePublisher:
@@ -31,6 +34,7 @@ class JointStatePublisher:
         self.processed_version = 0
         self.positions: dict[str, float] = {}
         self.setpoints: dict[str, float] = {}
+        self.velocities: dict[str, float] = {}
         registry.subscribe(self, TRAJECTORY_TOPIC)
         registry.register_handler(RESET_SERVICE, self.reset)
 
@@ -73,10 +77,23 @@ class JointStatePublisher:
     # -- servo and publish ------------------------------------------------------
 
     def step(self, dt: float) -> None:
-        for joint in self._movable():
-            current = self.positions[joint.name]
-            target = self._clamp(joint, self.setpoints.get(joint.name, current))
-            self.positions[joint.name] = current + max(-MAX_SPEED * dt, min(MAX_SPEED * dt, target - current))
+        while dt > 1e-9:
+            h = min(SUBSTEP_S, dt)
+            dt -= h
+            for joint in self._movable():
+                self._substep(joint, h)
+
+    def _substep(self, joint, h: float) -> None:
+        current = self.positions[joint.name]
+        error = self._clamp(joint, self.setpoints.get(joint.name, current)) - current
+        # fastest speed that can still stop at the target, then change speed by at most MAX_ACCEL * h
+        wanted = min(MAX_SPEED, (2 * MAX_ACCEL * abs(error)) ** 0.5) * (1 if error > 0 else -1)
+        v = self.velocities.get(joint.name, 0.0)
+        v += max(-MAX_ACCEL * h, min(MAX_ACCEL * h, wanted - v))
+        if abs(v * h) >= abs(error) and v * error >= 0:  # reaches the target this substep
+            self.positions[joint.name], self.velocities[joint.name] = current + error, 0.0
+        else:
+            self.positions[joint.name], self.velocities[joint.name] = current + v * h, v
 
     def publish(self) -> None:
         if self.robot is None:

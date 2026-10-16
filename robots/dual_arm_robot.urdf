@@ -1,0 +1,235 @@
+<?xml version="1.0"?>
+<!-- Demo robot for make demo: a tracked base that drives around a dance floor (x and y slides plus a spin
+     under the chassis), an ankle roll above the treads, a torso on a vertical prismatic lift that bends (waist hinge: pitch, positive leans forward, and roll, sideways) and twists at the waist, a head, and two arms.
+     Each arm is shoulder pitch (about y), shoulder roll (about x, through the shoulder actuator link), shoulder
+     yaw (twists the upper arm about its long axis, so the forearm can cross the body), elbow
+     pitch, an elbow roll (about x), a wrist roll that swings the hand sideways (about the forearm's x), and a wrist yaw that twists the hand
+     about its own long axis. At zero the arms hang straight down; positive shoulder roll swings the left arm
+     out sideways and the right arm in, so mirror-image poses negate it. Every revolute joint turns a full
+     circle (±π); only the prismatic slides keep their travel limits. Multiple visuals per link are decoration only. -->
+<robot name="dual_arm_robot">
+  <material name="steel"><color rgba="0.78 0.8 0.84 1"/></material>
+  <material name="gunmetal"><color rgba="0.2 0.22 0.26 1"/></material>
+  <material name="rubber"><color rgba="0.08 0.08 0.09 1"/></material>
+  <material name="safety_orange"><color rgba="1 0.45 0.1 1"/></material>
+  <material name="floor_blue"><color rgba="0.12 0.16 0.24 1"/></material>
+  <material name="glow"><color rgba="0.2 0.9 1 1"/></material>
+
+  <link name="dance_floor">
+    <visual><origin xyz="0 0 0.002"/><geometry><box size="2.4 2.4 0.004"/></geometry><material name="floor_blue"/></visual>
+  </link>
+  <link name="drive_x_link"/>
+  <link name="drive_y_link"/>
+  <joint name="drive_x" type="prismatic">
+    <parent link="dance_floor"/><child link="drive_x_link"/>
+    <origin xyz="0 0 0.004"/><axis xyz="1 0 0"/>
+    <limit lower="-1" upper="1" effort="100" velocity="1"/>
+  </joint>
+  <joint name="drive_y" type="prismatic">
+    <parent link="drive_x_link"/><child link="drive_y_link"/>
+    <origin xyz="0 0 0"/><axis xyz="0 1 0"/>
+    <limit lower="-1" upper="1" effort="100" velocity="1"/>
+  </joint>
+  <joint name="drive_yaw" type="continuous">
+    <parent link="drive_y_link"/><child link="base_link"/>
+    <origin xyz="0 0 0"/><axis xyz="0 0 1"/>
+  </joint>
+
+  <link name="base_link">
+    <visual><origin xyz="0 0 0.07"/><geometry><box size="0.42 0.26 0.1"/></geometry><material name="gunmetal"/></visual>
+    <visual><origin xyz="0 0.17 0.07"/><geometry><box size="0.54 0.08 0.14"/></geometry><material name="rubber"/></visual>
+    <visual><origin xyz="0 -0.17 0.07"/><geometry><box size="0.54 0.08 0.14"/></geometry><material name="rubber"/></visual>
+    <visual><origin xyz="0 0 0.13"/><geometry><box size="0.2 0.2 0.03"/></geometry><material name="safety_orange"/></visual>
+  </link>
+  <link name="pelvis">
+    <visual><origin xyz="0 0 0.06"/><geometry><box size="0.16 0.24 0.08"/></geometry><material name="gunmetal"/></visual>
+  </link>
+  <link name="waist_link">  <!-- the hinge barrel on top of the pelvis -->
+    <visual><origin xyz="0 0 0" rpy="1.5708 0 0"/><geometry><cylinder radius="0.035" length="0.2"/></geometry><material name="safety_orange"/></visual>
+  </link>
+  <link name="torso">
+    <visual><origin xyz="0 0 0.27"/><geometry><box size="0.22 0.34 0.34"/></geometry><material name="steel"/></visual>
+    <visual><origin xyz="0.112 0 0.3"/><geometry><box size="0.01 0.2 0.14"/></geometry><material name="gunmetal"/></visual>
+    <visual><origin xyz="0.118 -0.05 0.33"/><geometry><box size="0.008 0.03 0.02"/></geometry><material name="glow"/></visual>
+    <visual><origin xyz="0.118 0 0.33"/><geometry><box size="0.008 0.03 0.02"/></geometry><material name="glow"/></visual>
+    <visual><origin xyz="0.118 0.05 0.33"/><geometry><box size="0.008 0.03 0.02"/></geometry><material name="safety_orange"/></visual>
+    <visual><origin xyz="0.118 0 0.27"/><geometry><box size="0.008 0.16 0.012"/></geometry><material name="glow"/></visual>
+    <visual><origin xyz="0 0 0.48"/><geometry><cylinder radius="0.04" length="0.08"/></geometry><material name="gunmetal"/></visual>
+  </link>
+  <link name="head">
+    <visual><origin xyz="0 0 0.08"/><geometry><box size="0.18 0.22 0.16"/></geometry><material name="steel"/></visual>
+    <visual><origin xyz="0 0 0.08" rpy="1.5708 0 0"/><geometry><cylinder radius="0.035" length="0.25"/></geometry><material name="gunmetal"/></visual>
+    <visual><origin xyz="0.091 0 0.09"/><geometry><box size="0.01 0.18 0.06"/></geometry><material name="gunmetal"/></visual>
+    <visual><origin xyz="0.097 0.045 0.09"/><geometry><sphere radius="0.018"/></geometry><material name="glow"/></visual>
+    <visual><origin xyz="0.097 -0.045 0.09"/><geometry><sphere radius="0.018"/></geometry><material name="glow"/></visual>
+    <visual><origin xyz="0 0 0.21"/><geometry><cylinder radius="0.006" length="0.1"/></geometry><material name="gunmetal"/></visual>
+    <visual><origin xyz="0 0 0.27"/><geometry><sphere radius="0.018"/></geometry><material name="safety_orange"/></visual>
+  </link>
+  <link name="ankle_link"/>
+  <joint name="ankle_roll" type="revolute">  <!-- at the orange collar: the treads stay flat, everything above leans sideways -->
+    <parent link="base_link"/><child link="ankle_link"/>
+    <origin xyz="0 0 0.13"/><axis xyz="1 0 0"/>
+    <limit lower="-3.14159" upper="3.14159" effort="100" velocity="1.5"/>
+  </joint>
+  <joint name="torso_lift_z" type="prismatic">
+    <parent link="ankle_link"/><child link="pelvis"/>
+    <origin xyz="0 0 0.07"/><axis xyz="0 0 1"/>
+    <limit lower="0" upper="0.3" effort="100" velocity="0.2"/>
+  </joint>
+  <joint name="waist_pitch" type="revolute">
+    <parent link="pelvis"/><child link="waist_link"/>
+    <origin xyz="0 0 0.1"/><axis xyz="0 1 0"/>
+    <limit lower="-3.14159" upper="3.14159" effort="50" velocity="1.5"/>
+  </joint>
+  <link name="waist_roll_link"/>
+  <joint name="waist_roll" type="revolute">  <!-- leans the torso sideways at the same hinge -->
+    <parent link="waist_link"/><child link="waist_roll_link"/>
+    <origin xyz="0 0 0"/><axis xyz="1 0 0"/>
+    <limit lower="-3.14159" upper="3.14159" effort="50" velocity="1.5"/>
+  </joint>
+  <joint name="waist_yaw" type="revolute">  <!-- back down to the pelvis frame, so the torso's visuals are unchanged -->
+    <parent link="waist_roll_link"/><child link="torso"/>
+    <origin xyz="0 0 -0.1"/><axis xyz="0 0 1"/>
+    <limit lower="-3.14159" upper="3.14159" effort="50" velocity="1.5"/>
+  </joint>
+  <joint name="neck" type="fixed">
+    <parent link="torso"/><child link="head"/>
+    <origin xyz="0 0 0.52"/>
+  </joint>
+
+  <link name="left_shoulder_link">
+    <visual><origin xyz="0 0.03 0" rpy="1.5708 0 0"/><geometry><cylinder radius="0.055" length="0.06"/></geometry><material name="gunmetal"/></visual>
+  </link>
+  <link name="left_upper_arm">
+    <visual><origin xyz="0 0 -0.13"/><geometry><box size="0.07 0.07 0.2"/></geometry><material name="steel"/></visual>
+    <visual><origin xyz="0 0 -0.06"/><geometry><box size="0.075 0.075 0.03"/></geometry><material name="safety_orange"/></visual>
+    <visual><origin xyz="0 0 -0.26" rpy="1.5708 0 0"/><geometry><cylinder radius="0.04" length="0.08"/></geometry><material name="gunmetal"/></visual>
+  </link>
+  <link name="left_forearm">
+    <visual><origin xyz="0 0 -0.1"/><geometry><box size="0.06 0.06 0.17"/></geometry><material name="steel"/></visual>
+    <visual><origin xyz="0 0 -0.2"/><geometry><cylinder radius="0.035" length="0.03"/></geometry><material name="gunmetal"/></visual>
+  </link>
+  <link name="left_hand">
+    <visual><origin xyz="0 0 -0.015"/><geometry><box size="0.07 0.09 0.03"/></geometry><material name="gunmetal"/></visual>
+    <visual><origin xyz="0 0.035 -0.065"/><geometry><box size="0.025 0.015 0.07"/></geometry><material name="safety_orange"/></visual>
+    <visual><origin xyz="0 -0.035 -0.065"/><geometry><box size="0.025 0.015 0.07"/></geometry><material name="safety_orange"/></visual>
+  </link>
+  <joint name="left_shoulder_pitch" type="revolute">
+    <parent link="torso"/><child link="left_shoulder_link"/>
+    <origin xyz="0 0.19 0.42"/><axis xyz="0 1 0"/>
+    <limit lower="-3.14159" upper="3.14159" effort="10" velocity="1.5"/>
+  </joint>
+  <joint name="left_shoulder_roll" type="revolute">
+    <parent link="left_shoulder_link"/><child link="left_shoulder_roll_link"/>
+    <origin xyz="0 0.06 0"/><axis xyz="1 0 0"/>
+    <limit lower="-3.14159" upper="3.14159" effort="10" velocity="1.5"/>
+  </joint>
+  <link name="left_shoulder_roll_link"/>
+  <joint name="left_shoulder_yaw" type="revolute">  <!-- twists the upper arm, so the elbow can bend across the body -->
+    <parent link="left_shoulder_roll_link"/><child link="left_upper_arm"/>
+    <origin xyz="0 0 0"/><axis xyz="0 0 1"/>
+    <limit lower="-3.14159" upper="3.14159" effort="10" velocity="1.5"/>
+  </joint>
+  <link name="left_elbow_link"/>
+  <joint name="left_elbow_pitch" type="revolute">
+    <parent link="left_upper_arm"/><child link="left_elbow_link"/>
+    <origin xyz="0 0 -0.26"/><axis xyz="0 1 0"/>
+    <limit lower="-3.14159" upper="3.14159" effort="10" velocity="1.5"/>
+  </joint>
+  <joint name="left_elbow_roll" type="revolute">  <!-- swings the forearm sideways at the elbow -->
+    <parent link="left_elbow_link"/><child link="left_elbow_roll_link"/>
+    <origin xyz="0 0 0"/><axis xyz="1 0 0"/>
+    <limit lower="-3.14159" upper="3.14159" effort="10" velocity="1.5"/>
+  </joint>
+  <link name="left_elbow_roll_link"/>
+  <joint name="left_elbow_yaw" type="revolute">  <!-- twists the forearm about its length -->
+    <parent link="left_elbow_roll_link"/><child link="left_forearm"/>
+    <origin xyz="0 0 0"/><axis xyz="0 0 1"/>
+    <limit lower="-3.14159" upper="3.14159" effort="10" velocity="1.5"/>
+  </joint>
+  <link name="left_wrist_link"/>
+  <joint name="left_wrist_roll" type="revolute">
+    <parent link="left_forearm"/><child link="left_wrist_link"/>
+    <origin xyz="0 0 -0.22"/><axis xyz="1 0 0"/>
+    <limit lower="-3.14159" upper="3.14159" effort="5" velocity="3"/>
+  </joint>
+  <link name="left_wrist_pitch_link"/>
+  <joint name="left_wrist_pitch" type="revolute">  <!-- bends the hand forward and back -->
+    <parent link="left_wrist_link"/><child link="left_wrist_pitch_link"/>
+    <origin xyz="0 0 0"/><axis xyz="0 1 0"/>
+    <limit lower="-3.14159" upper="3.14159" effort="5" velocity="3"/>
+  </joint>
+  <joint name="left_wrist_yaw" type="revolute">
+    <parent link="left_wrist_pitch_link"/><child link="left_hand"/>
+    <origin xyz="0 0 0"/><axis xyz="0 0 1"/>
+    <limit lower="-3.14159" upper="3.14159" effort="5" velocity="3"/>
+  </joint>
+
+  <link name="right_shoulder_link">
+    <visual><origin xyz="0 -0.03 0" rpy="1.5708 0 0"/><geometry><cylinder radius="0.055" length="0.06"/></geometry><material name="gunmetal"/></visual>
+  </link>
+  <link name="right_upper_arm">
+    <visual><origin xyz="0 0 -0.13"/><geometry><box size="0.07 0.07 0.2"/></geometry><material name="steel"/></visual>
+    <visual><origin xyz="0 0 -0.06"/><geometry><box size="0.075 0.075 0.03"/></geometry><material name="safety_orange"/></visual>
+    <visual><origin xyz="0 0 -0.26" rpy="1.5708 0 0"/><geometry><cylinder radius="0.04" length="0.08"/></geometry><material name="gunmetal"/></visual>
+  </link>
+  <link name="right_forearm">
+    <visual><origin xyz="0 0 -0.1"/><geometry><box size="0.06 0.06 0.17"/></geometry><material name="steel"/></visual>
+    <visual><origin xyz="0 0 -0.2"/><geometry><cylinder radius="0.035" length="0.03"/></geometry><material name="gunmetal"/></visual>
+  </link>
+  <link name="right_hand">
+    <visual><origin xyz="0 0 -0.015"/><geometry><box size="0.07 0.09 0.03"/></geometry><material name="gunmetal"/></visual>
+    <visual><origin xyz="0 0.035 -0.065"/><geometry><box size="0.025 0.015 0.07"/></geometry><material name="safety_orange"/></visual>
+    <visual><origin xyz="0 -0.035 -0.065"/><geometry><box size="0.025 0.015 0.07"/></geometry><material name="safety_orange"/></visual>
+  </link>
+  <joint name="right_shoulder_pitch" type="revolute">
+    <parent link="torso"/><child link="right_shoulder_link"/>
+    <origin xyz="0 -0.19 0.42"/><axis xyz="0 1 0"/>
+    <limit lower="-3.14159" upper="3.14159" effort="10" velocity="1.5"/>
+  </joint>
+  <joint name="right_shoulder_roll" type="revolute">
+    <parent link="right_shoulder_link"/><child link="right_shoulder_roll_link"/>
+    <origin xyz="0 -0.06 0"/><axis xyz="1 0 0"/>
+    <limit lower="-3.14159" upper="3.14159" effort="10" velocity="1.5"/>
+  </joint>
+  <link name="right_shoulder_roll_link"/>
+  <joint name="right_shoulder_yaw" type="revolute">  <!-- twists the upper arm, so the elbow can bend across the body -->
+    <parent link="right_shoulder_roll_link"/><child link="right_upper_arm"/>
+    <origin xyz="0 0 0"/><axis xyz="0 0 1"/>
+    <limit lower="-3.14159" upper="3.14159" effort="10" velocity="1.5"/>
+  </joint>
+  <link name="right_elbow_link"/>
+  <joint name="right_elbow_pitch" type="revolute">
+    <parent link="right_upper_arm"/><child link="right_elbow_link"/>
+    <origin xyz="0 0 -0.26"/><axis xyz="0 1 0"/>
+    <limit lower="-3.14159" upper="3.14159" effort="10" velocity="1.5"/>
+  </joint>
+  <joint name="right_elbow_roll" type="revolute">  <!-- swings the forearm sideways at the elbow -->
+    <parent link="right_elbow_link"/><child link="right_elbow_roll_link"/>
+    <origin xyz="0 0 0"/><axis xyz="1 0 0"/>
+    <limit lower="-3.14159" upper="3.14159" effort="10" velocity="1.5"/>
+  </joint>
+  <link name="right_elbow_roll_link"/>
+  <joint name="right_elbow_yaw" type="revolute">  <!-- twists the forearm about its length -->
+    <parent link="right_elbow_roll_link"/><child link="right_forearm"/>
+    <origin xyz="0 0 0"/><axis xyz="0 0 1"/>
+    <limit lower="-3.14159" upper="3.14159" effort="10" velocity="1.5"/>
+  </joint>
+  <link name="right_wrist_link"/>
+  <joint name="right_wrist_roll" type="revolute">
+    <parent link="right_forearm"/><child link="right_wrist_link"/>
+    <origin xyz="0 0 -0.22"/><axis xyz="1 0 0"/>
+    <limit lower="-3.14159" upper="3.14159" effort="5" velocity="3"/>
+  </joint>
+  <link name="right_wrist_pitch_link"/>
+  <joint name="right_wrist_pitch" type="revolute">  <!-- bends the hand forward and back -->
+    <parent link="right_wrist_link"/><child link="right_wrist_pitch_link"/>
+    <origin xyz="0 0 0"/><axis xyz="0 1 0"/>
+    <limit lower="-3.14159" upper="3.14159" effort="5" velocity="3"/>
+  </joint>
+  <joint name="right_wrist_yaw" type="revolute">
+    <parent link="right_wrist_pitch_link"/><child link="right_hand"/>
+    <origin xyz="0 0 0"/><axis xyz="0 0 1"/>
+    <limit lower="-3.14159" upper="3.14159" effort="5" velocity="3"/>
+  </joint>
+</robot>

@@ -13,19 +13,85 @@
   #overlay h1 { font-size: 1rem; margin: 0 0 0.25rem; }
   #overlay .note { color: var(--muted); }
   #panel { position: absolute; top: 0; right: 0; width: 300px; max-width: 100vw; height: 100vh; overflow-y: auto;
-           background: var(--panel); padding: 0.9rem 1rem 2rem; font-size: 0.8rem; }
+           background: var(--panel); padding: 0.9rem 1rem 2rem; font-size: 0.8rem; transition: transform 0.25s ease; }
+  #panel-toggle { position: absolute; top: 50%; right: 300px; transform: translateY(-50%); z-index: 2; padding: 0.6rem 0.25rem;
+                  border-radius: 6px 0 0 6px; border-right: none; transition: right 0.25s ease; }
+  body.panel-hidden #panel { transform: translateX(100%); visibility: hidden; transition: transform 0.25s ease, visibility 0s 0.25s; }
+  body.panel-hidden #panel-toggle { right: 0; }
   #panel h2 { font-size: 0.9rem; margin: 0 0 0.6rem; }
   .controls { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.9rem; flex-wrap: wrap; }
   button { background: #2c3038; color: var(--text); border: 1px solid #444a54; border-radius: 6px; padding: 0.35rem 0.7rem;
            font: inherit; cursor: pointer; }
   button:hover { border-color: var(--accent); }
-  label.toggle { display: flex; gap: 0.35rem; align-items: center; cursor: pointer; }
+  .choreo { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.6rem; color: var(--muted); }
+  .choreo select { flex: 1; min-width: 0; background: #2c3038; color: var(--text); border: 1px solid #444a54;
+                   border-radius: 6px; padding: 0.3rem 0.4rem; font: inherit; }
   .joint { margin-bottom: 0.65rem; }
   .joint .row { display: flex; justify-content: space-between; color: var(--muted); }
   .joint .row b { color: var(--text); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .joint .val input { width: 4.6rem; text-align: right; font: inherit; color: var(--muted); background: transparent;
+                      border: 1px solid transparent; border-radius: 4px; padding: 0 0.2rem; -moz-appearance: textfield; }
+  .joint .val input::-webkit-inner-spin-button { -webkit-appearance: none; }
+  .joint .val input:hover { border-color: #444a54; cursor: text; }
+  .joint .val input:focus { color: var(--text); border-color: var(--accent); outline: none; background: #2c3038; }
   .joint input { width: 100%; accent-color: var(--accent); margin: 0.2rem 0 0; }
   #hide { position: absolute; top: 0.6rem; right: 0.6rem; }
-  @media (max-width: 640px) { #panel { height: 45vh; top: auto; bottom: 0; width: 100vw; } }
+  #fsm { position: absolute; left: 0.75rem; top: 5.5rem; max-height: calc(100vh - 6.5rem); overflow: auto;
+         max-width: calc(100vw - 1.5rem); resize: both; min-width: 12rem; min-height: 4rem;
+         background: var(--panel); border-radius: 8px; padding: 0.6rem 0.75rem; font-size: 0.75rem; }
+  #fsm[hidden] { display: none; }
+  #fsm h2 { font-size: 0.85rem; margin: 0 0 0.4rem; display: flex; justify-content: space-between; gap: 1rem; }
+  #fsm h2 span { color: var(--muted); font-weight: 400; }
+  #fsm h2 .ctl { display: flex; gap: 0.6rem; align-items: center; }
+  #fsm h2 button { padding: 0.15rem 0.6rem; font-size: 0.8rem; min-width: 4.8rem; }
+  #fsm svg { display: block; }
+  #fsm.sized svg { width: 100%; height: auto; }  /* after a drag of the corner handle, the graph follows the box */
+  #fsm .node rect { fill: #2c3038; stroke: #444a54; transition: fill 0.15s, stroke 0.15s; }
+  #fsm .node { cursor: pointer; outline: none; user-select: none; touch-action: none; }
+  #fsm .node.dragging { pointer-events: none; opacity: 0.75; cursor: grabbing; }
+  #fsm .node.drop rect { stroke: var(--accent); stroke-width: 3px; fill: #3a2a1c; }
+  #fsm .node:hover rect { stroke: var(--accent); }
+  #fsm .node.selected rect { stroke: var(--accent); stroke-width: 2px; stroke-dasharray: 5 3; }
+  #fsm .node:focus-visible rect { stroke: var(--accent); stroke-width: 2px; }
+  #fsm .node text { dominant-baseline: central; text-anchor: middle; }
+  #fsm .node .name { fill: var(--text); font-size: 11px; font-weight: 500; }
+  #fsm .node .sub { fill: var(--muted); font-size: 9.5px; }
+  #fsm .node.current .sub { fill: #3a1d08; }
+  #fsm .edge.manual { stroke-dasharray: 4 3; }
+  #fsm .elabel { fill: var(--muted); font-size: 9px; dominant-baseline: central;
+                 paint-order: stroke; stroke: #1c1f25; stroke-width: 3px; }
+  #fsm .elabel.taken { fill: var(--accent); }
+  #fsm-edit { border-top: 1px solid #3a3f47; margin-top: 0.5rem; padding-top: 0.5rem; display: grid; gap: 0.4rem; }
+  #fsm-edit h3 { font-size: 0.8rem; margin: 0; }
+  #fsm-edit h3 span { color: var(--muted); font-weight: 400; margin-left: 0.4rem; }
+  #fsm-edit .row { display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap; color: var(--muted); }
+  #fsm-edit input, #fsm-edit select { background: #2c3038; color: var(--text); border: 1px solid #444a54;
+                                      border-radius: 6px; padding: 0.2rem 0.4rem; font: inherit; min-width: 0; }
+  #fsm-edit button { padding: 0.2rem 0.55rem; font-size: 0.75rem; }
+  #ed-name, #ed-file, #ed-next { flex: 1; }
+  #ed-eps { width: 4.5rem; }
+  #fsm-detail { border-top: 1px solid #3a3f47; margin-top: 0.3rem; padding-top: 0.5rem; }
+  #fsm-detail .now { display: flex; gap: 0.5rem; align-items: baseline; }
+  #fsm-detail .now span, #fsm-detail .meta { color: var(--muted); }
+  #fsm-detail .bar { height: 5px; background: #2c3038; border-radius: 3px; overflow: hidden; margin: 0.4rem 0 0.25rem; }
+  #fsm-detail .bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width 0.1s; }
+  #fsm-detail table { border-collapse: collapse; margin: 0.35rem 0 0.2rem; font-variant-numeric: tabular-nums; }
+  #fsm-detail td { padding: 1px 0.6rem 1px 0; }
+  #fsm-detail td.num { text-align: right; }
+  #fsm-detail td.target { color: var(--muted); }
+  #fsm .node.initial rect { stroke: var(--muted); stroke-dasharray: 3 2; }
+  #fsm .node.current rect { fill: var(--accent); stroke: var(--accent); }
+  #fsm .node.current text { fill: #15171b; font-weight: 600; }
+  #fsm .edge { fill: none; stroke: #4a505b; stroke-width: 1.4; marker-end: url(#arrow); }
+  #fsm .edge.taken { stroke: var(--accent); stroke-width: 2.2; marker-end: url(#arrow-hot); }
+  @media (max-width: 640px) {
+    #panel { height: 45vh; top: auto; bottom: 0; width: 100vw; }
+    #panel-toggle { top: auto; right: 0.5rem; bottom: 45vh; transform: none; padding: 0.25rem 0.6rem; border-radius: 6px 6px 0 0;
+                    border-right: 1px solid #444a54; border-bottom: none; transition: bottom 0.25s ease; }
+    body.panel-hidden #panel { transform: translateY(100%); }
+    body.panel-hidden #panel-toggle { right: 0.5rem; bottom: 0; }
+    #fsm { max-height: calc(55vh - 6.5rem); }
+  }
 </style>
 </head>
 <body>
@@ -34,10 +100,43 @@
   <div id="state">waiting for /xform_world&hellip;</div>
   <div class="note">every link pose from /xform_world &mdash; drag to orbit, scroll to zoom</div>
 </div>
+<div id="fsm" hidden>
+  <h2>State machine <span class="ctl"><span id="fsm-mode"></span><button id="running">Play</button></span></h2>
+  <svg id="fsm-graph" role="img" aria-label="Choreography state machine"></svg>
+  <div id="fsm-detail">
+    <div class="now"><b id="fsm-now" aria-live="polite"></b> <span id="fsm-next"></span></div>
+    <div class="bar" title="arrival: worst joint error against the state's epsilon"><i id="fsm-bar"></i></div>
+    <div class="meta" id="fsm-meta"></div>
+    <table id="fsm-joints"></table>
+    <div class="meta" id="fsm-held"></div>
+  </div>
+  <div id="fsm-edit">
+    <h3>Edit choreo <span>pose with the sliders, then record</span></h3>
+    <div class="row">
+      <input id="ed-name" aria-label="state name">
+      <label>± <input id="ed-eps" type="number" step="0.01" min="0" aria-label="arrival tolerance"></label>
+    </div>
+    <label class="row">then <select id="ed-next" aria-label="next state"></select></label>
+    <label class="row" title="or drag a state onto another">swap places with <select id="ed-swap" aria-label="swap places with"></select></label>
+    <div class="row">
+      <button id="ed-record" title="Add the sliders' pose as a new state right after this one">Record pose after</button>
+      <button id="ed-update" title="Replace this state's pose with the sliders' pose">Update pose</button>
+      <button id="ed-dup" title="Add a copy of this state right after it">Duplicate</button>
+      <button id="ed-delete">Delete</button>
+    </div>
+    <div class="row">
+      <input id="ed-file" placeholder="choreo name" aria-label="choreo name">
+      <button id="ed-save">Save</button>
+    </div>
+    <div class="meta" id="ed-msg" aria-live="polite"></div>
+  </div>
+</div>
+<button id="panel-toggle" aria-controls="panel" aria-expanded="true" title="hide the joints panel">&#x25B8;</button>
 <div id="panel">
   <h2>Joints</h2>
+  <div class="choreo"><label for="choreo">Choreography</label> <select id="choreo"></select>
+    <button id="choreo-del" title="delete this saved choreo (moved to fsm/.deleted/)">Delete</button></div>
   <div class="controls">
-    <label class="toggle"><input type="checkbox" id="running"> Run choreography</label>
     <button id="reset" title="Every joint to the middle of its limits">Home</button>
   </div>
   <div id="sliders"></div>
@@ -54,7 +153,7 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x15171b);
 scene.fog = new THREE.Fog(0x15171b, 6, 14);
 const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.01, 100);
-camera.position.set(1.3, 1.0, 1.4);
+camera.position.set(2.6, 1.3, -0.7);  // in front of the robot (it faces world +x), slightly to its left
 const renderer = new THREE.WebGLRenderer({antialias: true});
 renderer.setPixelRatio(devicePixelRatio);
 renderer.setSize(innerWidth, innerHeight);
@@ -86,8 +185,14 @@ const world = new THREE.Group();
 world.rotation.x = -Math.PI / 2;
 scene.add(world);
 
-const shell = new THREE.MeshStandardMaterial({color: 0xdfe3e8, roughness: 0.45, metalness: 0.1});
-const dark = new THREE.MeshStandardMaterial({color: 0x3b4049, roughness: 0.6, metalness: 0.2});
+const shell = new THREE.MeshStandardMaterial({color: 0xdfe3e8, roughness: 0.35, metalness: 0.45});
+const dark = new THREE.MeshStandardMaterial({color: 0x3b4049, roughness: 0.45, metalness: 0.6});
+const painted = {};  // one material per URDF color
+function paint(rgb) {
+  const key = rgb.join();
+  return painted[key] ??= new THREE.MeshStandardMaterial({color: new THREE.Color(...rgb).convertSRGBToLinear(),
+                                                          roughness: 0.35, metalness: 0.5});
+}
 const accent = new THREE.MeshStandardMaterial({color: 0xff8a3d, roughness: 0.4, metalness: 0.1});
 const Y = new THREE.Vector3(0, 1, 0);
 
@@ -100,12 +205,13 @@ function mesh(geometry, material) {
 // A URDF box / cylinder / sphere visual, placed by its origin (rpy is Rz·Ry·Rx = three.js Euler order "ZYX").
 function primitive(v) {
   let m;
-  if (v.type === "box") m = mesh(new THREE.BoxGeometry(...v.size), shell);
-  else if (v.type === "sphere") m = mesh(new THREE.SphereGeometry(v.size[0], 24, 16), shell);
+  const material = v.color ? paint(v.color) : shell;
+  if (v.type === "box") m = mesh(new THREE.BoxGeometry(...v.size), material);
+  else if (v.type === "sphere") m = mesh(new THREE.SphereGeometry(v.size[0], 24, 16), material);
   else {
     const g = new THREE.CylinderGeometry(v.size[0], v.size[0], v.size[1], 32);
     g.rotateX(Math.PI / 2);  // URDF cylinders run along z, three.js ones along y
-    m = mesh(g, shell);
+    m = mesh(g, material);
   }
   m.position.set(...v.xyz);
   m.rotation.set(v.rpy[0], v.rpy[1], v.rpy[2], "ZYX");
@@ -128,6 +234,7 @@ let links = {}, linkKey = "", loading = false, sliders = {};
 function buildBody(robot) {
   world.clear();
   links = {};
+  glides.clear();
   for (const name of robot.links) {
     const obj = new THREE.Object3D();
     obj.matrixAutoUpdate = false;
@@ -135,15 +242,17 @@ function buildBody(robot) {
     world.add(obj);
     links[name] = obj;
   }
-  for (const [name, v] of Object.entries(robot.visuals)) links[name]?.add(primitive(v));
+  for (const [name, list] of Object.entries(robot.visuals)) for (const v of list) links[name]?.add(primitive(v));
   for (const j of robot.joints) {
     const parent = links[j.parent], child = links[j.child];
     if (!robot.visuals[j.parent] && Math.hypot(...j.xyz) > 0.02) parent.add(limb(j.xyz));
-    if (j.type === "prismatic" && j.upper > 0.02) {  // a sleeve back along the axis covers the slide's stroke
+    // A bodiless child in a robot that has bodies is a virtual link (e.g. a drive axis): no sleeve or hub.
+    const virtual = !robot.visuals[j.child] && Object.keys(robot.visuals).length > 0;
+    if (j.type === "prismatic" && j.upper > 0.02 && !virtual) {  // a sleeve back along the axis covers the stroke
       const axis = new THREE.Vector3(...j.axis).normalize();
       child.add(limb(axis.multiplyScalar(-j.upper).toArray(), 0.07));
     }
-    if (j.type !== "fixed") {  // a joint hub on the child, oriented by the child's own frame
+    if (j.type !== "fixed" && !virtual) {  // a joint hub on the child, oriented by the child's own frame
       child.add(mesh(new THREE.SphereGeometry(j.type === "prismatic" ? 0.03 : 0.042, 24, 16),
                      j.type === "prismatic" ? dark : accent));
     }
@@ -163,6 +272,11 @@ function buildBody(robot) {
 
 // ---- sliders -----------------------------------------------------------------------------------------
 let pending = {}, timer = null, needSync = true, touchedAt = 0;
+const playBtn = document.getElementById("running");
+function setPlaying(on) {
+  playBtn.dataset.on = on;
+  playBtn.textContent = on ? "❚❚ Pause" : "▶ Play";
+}
 function sendSetpoints() {
   timer = null;
   const name = Object.keys(pending), position = Object.values(pending);
@@ -183,42 +297,67 @@ function buildSliders(robot) {
     const div = document.createElement("div");
     div.className = "joint";
     const unit = j.type === "prismatic" ? " m" : " rad";
-    div.innerHTML = `<div class="row"><b title="${j.name}">${j.name}</b><span>0${unit}</span></div>
-      <input type="range" min="${j.lower}" max="${j.upper}" step="${(j.upper - j.lower) / 1000}" value="0"
+    div.innerHTML = `<div class="row"><b title="${j.name}">${j.name}</b><label class="val"><input type="number"
+      step="any" value="0.000" aria-label="${j.name} value" title="click to type a value">${unit}</label></div>
+      <input type="range" min="${j.lower}" max="${j.upper}" step="any" value="0"
              aria-label="${j.name}">`;
-    const input = div.querySelector("input"), readout = div.querySelector("span");
+    const readout = div.querySelector(".val input"), input = div.querySelector("input[type=range]");
     const s = {input, readout, unit, held: false};
     input.addEventListener("pointerdown", () => { s.held = true; });
     addEventListener("pointerup", () => { s.held = false; });
     input.addEventListener("input", () => {
-      readout.textContent = Number(input.value).toFixed(3) + unit;
+      readout.value = Number(input.value).toFixed(3);
       pending[j.name] = Number(input.value);
       touchedAt = performance.now();
-      document.getElementById("running").checked = false;
+      setPlaying(false);
+      posed = true;
       if (!timer) timer = setTimeout(sendSetpoints, 50);
     });
+    readout.addEventListener("change", () => {  // a typed value moves the slider, clamped to the joint's limits
+      const v = Number(readout.value);
+      if (readout.value.trim() === "" || !Number.isFinite(v)) return readout.value = Number(input.value).toFixed(3);
+      input.value = Math.min(j.upper, Math.max(j.lower, v));
+      input.dispatchEvent(new Event("input"));
+    });
+    readout.addEventListener("keydown", e => { if (e.key === "Enter") readout.blur(); });
     sliders[j.name] = s;
     box.appendChild(div);
   }
 }
 
 function onJointStates(msg) {
+  msg.name.forEach((name, i) => jointPos[name] = msg.position[i]);
   // While the choreography runs, sliders follow the robot. Under manual control they hold the setpoint.
   // A status sent before the slider stopped the choreography may still say running: skip it.
   if (!needSync && (!fsm || !fsm.running || performance.now() - touchedAt < 1000)) return;
   needSync = false;
   msg.name.forEach((name, i) => {
     const s = sliders[name];
-    if (!s || s.held) return;
+    if (!s || s.held || document.activeElement === s.readout) return;  // not while dragging or typing
     s.input.value = msg.position[i];
-    s.readout.textContent = msg.position[i].toFixed(3) + s.unit;
+    s.readout.value = msg.position[i].toFixed(3);
   });
 }
 
-document.getElementById("running").addEventListener("change", e => post("/running", {data: e.target.checked}));
+playBtn.addEventListener("click", () => {
+  const on = playBtn.dataset.on !== "true";
+  touchedAt = performance.now();  // so a status sent before the click does not flip the button back
+  setPlaying(on);
+  if (on) { posed = false; selectForEdit(null); }  // playing drops the unrecorded pose
+  post("/running", {data: on});
+});
 document.getElementById("reset").addEventListener("click", () => {
-  document.getElementById("running").checked = false;
+  setPlaying(false);
   post("/reset", {});
+  // the sliders show the pose Home sends (the middle of each range, matching joint_state_publisher's reset),
+  // so Update pose / Record pose save it
+  for (const s of Object.values(sliders)) {
+    const v = (Number(s.input.min) + Number(s.input.max)) / 2;
+    s.input.value = v;
+    s.readout.value = v.toFixed(3);
+  }
+  touchedAt = performance.now();
+  posed = true;
 });
 
 // ---- live data ---------------------------------------------------------------------------------------
@@ -231,23 +370,547 @@ async function onXform(msg) {
       const robot = await (await fetch("/robot")).json();
       buildBody(robot);
       buildSliders(robot);
+      jointTypes = Object.fromEntries(robot.joints.map(j => [j.name, j.type]));
+      if (fsmTable) buildFsm(fsmTable);  // units in the graph depend on the joint types
+      loadChoreos();  // which saved choreographies fit this robot
       linkKey = key;
     } finally { loading = false; }
   }
+  const now = performance.now();
   for (const e of msg.transforms) {
     const obj = links[e.child_frame_id];
-    if (obj) { obj.matrix.fromArray(e.matrix); obj.matrixWorldNeedsUpdate = true; obj.visible = true; }  // column-major
+    if (!obj) continue;
+    const g = glides.get(obj) ?? {p0: new THREE.Vector3(), q0: new THREE.Quaternion(), p1: new THREE.Vector3(),
+                                  q1: new THREE.Quaternion(), s: new THREE.Vector3(), t0: -Infinity};
+    if (glides.has(obj)) { g.p0.copy(g.cur ?? g.p1); g.q0.copy(g.qcur ?? g.q1); }
+    new THREE.Matrix4().fromArray(e.matrix).decompose(g.p1, g.q1, g.s);  // column-major
+    if (!glides.has(obj)) { g.p0.copy(g.p1); g.q0.copy(g.q1); glides.set(obj, g); }
+    g.t0 = now;
+    obj.visible = true;
+  }
+}
+// poses arrive at 10 Hz; each link glides from where it is drawn to its newest pose over one interval
+const GLIDE_MS = 100, glides = new Map();
+function glide(now) {
+  for (const [obj, g] of glides) {
+    const a = Math.min(1, (now - g.t0) / GLIDE_MS);
+    g.cur = (g.cur ?? new THREE.Vector3()).lerpVectors(g.p0, g.p1, a);
+    g.qcur = (g.qcur ?? new THREE.Quaternion()).slerpQuaternions(g.q0, g.q1, a);
+    obj.matrix.compose(g.cur, g.qcur, g.s);
+    obj.matrixWorldNeedsUpdate = true;
   }
 }
 
+// ---- state machine diagram ---------------------------------------------------------------------------
+// A node graph laid out by walking the on_arrival transitions from initial_state: states before the walk
+// repeats form a chain leading into a ring of the looping states; states the walk never reaches sit in a
+// row below. Each node says what the state changes relative to the state that leads into it, each edge says
+// what fires it, and the card under the graph tracks the current state's joints against its target.
+const SVG = "http://www.w3.org/2000/svg";
+let fsmNodes = {}, fsmEdges = {}, fsmLoading = false, prevState = null, takenEdge = null;
+let fsmRev = null, fsmTable = null, fsmInfo = {}, fsmLoopHead = null, fsmLoops = 0, jointTypes = {};
+const jointPos = {};
+
+function svg(tag, attrs, parent) {
+  const el = document.createElementNS(SVG, tag);
+  for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+  parent?.appendChild(el);
+  return el;
+}
+
+const shortJoint = n => n.replace(/^right_/, "R ").replace(/^left_/, "L ").replace("shoulder_", "sh ")
+  .replace("drive_yaw", "spin").replace("torso_lift", "lift").replace(/_/g, " ");
+const isLinear = n => jointTypes[n] === "prismatic";
+const fmt = (n, v, signed = false) => (signed && v > 0 ? "+" : "") +
+  (isLinear(n) ? `${(v * 100).toFixed(0)} cm` : `${(v * 180 / Math.PI).toFixed(0)}°`);
+const targetOf = s => Object.fromEntries((s.target?.joint_names ?? []).map((n, i) => [n, s.target.positions[i]]));
+
+function buildFsm(table) {
+  const graph = document.getElementById("fsm-graph");
+  graph.replaceChildren();
+  fsmNodes = {}; fsmEdges = {}; fsmInfo = {}; prevState = null; takenEdge = null; fsmTable = table; fsmLoops = 0; editSel = null;
+  const states = table.states ?? [];
+  document.getElementById("fsm").hidden = !states.length;
+  if (!states.length) return;
+  const H = 36, ROW = 60, PAD = 40;
+  const byName = Object.fromEntries(states.map(s => [s.name, s]));
+  const next = s => (s.transitions?.find(t => t.name === s.on_arrival) ?? s.transitions?.[0])?.next_state;
+
+  // walk from the initial state: [chain..., ring...], where the ring is where the walk comes back to
+  const path = [], seen = {};
+  let cur = table.initial_state;
+  while (byName[cur] && !(cur in seen)) { seen[cur] = path.length; path.push(cur); cur = next(byName[cur]); }
+  const split = cur in seen ? seen[cur] : path.length;
+  const chain = path.slice(0, split), ring = path.slice(split), rest = states.map(s => s.name).filter(n => !(n in seen));
+  fsmLoopHead = ring.length > 1 ? ring[0] : null;
+
+  // what each state does: its joint moves from the state that leads into it (for the ring head, the ring's end)
+  const from = {};
+  path.forEach((n, i) => { if (i) from[n] = path[i - 1]; });
+  if (ring.length > 1) from[ring[0]] = ring[ring.length - 1];
+  for (const s of states) {
+    const target = targetOf(s), before = from[s.name] ? targetOf(byName[from[s.name]]) : null;
+    const moves = Object.entries(target)
+      .map(([n, v]) => ({name: n, target: v, delta: before && n in before ? v - before[n] : null}))
+      .filter(m => m.delta === null || Math.abs(m.delta) > 1e-3)
+      .sort((a, b) => Math.abs(b.delta ?? 0) * (isLinear(b.name) ? 5 : 1) - Math.abs(a.delta ?? 0) * (isLinear(a.name) ? 5 : 1));
+    const sub = !before ? (s.name === table.initial_state ? "start pose" : "off the main path")
+      : !moves.length ? "hold"
+      : moves.slice(0, 2).map(m => `${shortJoint(m.name)} ${fmt(m.name, m.delta, true)}`).join(" · ")
+        + (moves.length > 2 ? ` +${moves.length - 2}` : "");
+    fsmInfo[s.name] = {moves, before: from[s.name], sub, eps: s.epsilon ?? 0, next: next(s), target};
+  }
+  const width = n => Math.max(64, n.length * 6.8, fsmInfo[n].sub.length * 5.3) + 22;
+
+  const pos = {}, R = ring.length < 2 ? 0 : Math.max(70, ring.reduce((a, n) => a + width(n), 0) / (2 * Math.PI) + 30);
+  ring.forEach((n, i) => {  // clockwise from the top, so the chain enters from above
+    const a = -Math.PI / 2 + 2 * Math.PI * i / ring.length;
+    pos[n] = [R * Math.cos(a), 0.8 * R * Math.sin(a)];
+  });
+  chain.forEach((n, i) => pos[n] = [0, -0.8 * R - (chain.length - i) * ROW]);
+  rest.forEach((n, i) => pos[n] = [0, 0.8 * R + (i + 1) * ROW]);
+
+  const defs = svg("defs", {}, graph);
+  for (const [id, color] of [["arrow", "#5a616d"], ["arrow-hot", "#ff8a3d"]]) {
+    const m = svg("marker", {id, viewBox: "0 0 10 10", refX: 9, refY: 5, markerWidth: 6, markerHeight: 6,
+                             orient: "auto-start-reverse"}, defs);
+    svg("path", {d: "M0,0 L10,5 L0,10 z", fill: color}, m);
+  }
+  // the point where the ray from a node's centre toward `to` leaves its box, pushed out by `gap`
+  const exit = (name, to, gap) => {
+    const [x, y] = pos[name], dx = to[0] - x, dy = to[1] - y, len = Math.hypot(dx, dy) || 1;
+    const t = Math.min(dx ? width(name) / 2 / Math.abs(dx) : Infinity, dy ? H / 2 / Math.abs(dy) : Infinity);
+    return [x + dx * t + dx / len * gap, y + dy * t + dy / len * gap];
+  };
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  const grow = (x0, y0, x1, y1) => {
+    minX = Math.min(minX, x0); minY = Math.min(minY, y0); maxX = Math.max(maxX, x1); maxY = Math.max(maxY, y1);
+  };
+  const inRing = new Set(ring), edges = new Set(), labels = [];
+  for (const s of states) for (const t of s.transitions ?? []) edges.add(`${s.name}->${t.next_state}`);
+  for (const s of states) for (const t of s.transitions ?? []) {
+    const a = s.name, b = t.next_state, [ax, ay] = pos[a], [bx, by] = pos[b];
+    let d, at;
+    if (a === b) {  // self-loop over the top of the box
+      const w = width(a) / 4, top = ay - H / 2;
+      d = `M${ax - w},${top} C${ax - w},${top - 28} ${ax + w},${top - 28} ${ax + w},${top - 2}`;
+      at = [ax, top - 26];
+    } else {
+      const mx = (ax + bx) / 2, my = (ay + by) / 2, len = Math.hypot(bx - ax, by - ay) || 1;
+      let c = [mx, my];
+      if (inRing.has(a) && inRing.has(b) && Math.hypot(mx, my) > 1) {  // bow outward along the ring
+        const k = 1.3 * Math.hypot(R, 0.8 * R) / Math.SQRT2 / Math.hypot(mx, my);
+        c = [mx * k, my * k];
+      } else if (edges.has(`${b}->${a}`)) {  // a pair of opposite edges: bend each to its own side
+        c = [mx + (by - ay) / len * 18, my - (bx - ax) / len * 18];
+      }
+      const p = exit(a, c, 1), q = exit(b, c, 3);
+      d = `M${p[0]},${p[1]} Q${c[0]},${c[1]} ${q[0]},${q[1]}`;
+      at = [(p[0] + 2 * c[0] + q[0]) / 4, (p[1] + 2 * c[1] + q[1]) / 4];  // the curve's midpoint
+    }
+    const auto = t.name === s.on_arrival;
+    const path = svg("path", {class: "edge" + (auto ? "" : " manual"), d}, graph);
+    svg("title", {}, path).textContent = auto
+      ? `${t.name}: fires when every joint of ${a} is within ε ${s.epsilon ?? 0} of its target`
+      : `${t.name}: fired by hand (/fsm/fire_transition)`;
+    labels.push({key: `${a}->${b}`, at, path, text: auto ? `arrive ±${s.epsilon ?? 0}` : t.name});
+  }
+  for (const {key, at, path, text} of labels) {  // drawn after every edge so no line crosses a label
+    const anchor = Math.abs(at[0]) < 4 ? "start" : at[0] > 0 ? "start" : "end";
+    const x = at[0] + (anchor === "start" ? 6 : -6);
+    const label = svg("text", {class: "elabel", x, y: at[1], "text-anchor": anchor}, graph);
+    label.textContent = text;
+    fsmEdges[key] = {path, label};
+    grow(anchor === "end" ? x - text.length * 5.2 : x, at[1] - 6, anchor === "end" ? x : x + text.length * 5.2, at[1] + 6);
+  }
+  for (const s of states) {
+    const [x, y] = pos[s.name], w = width(s.name), info = fsmInfo[s.name];
+    const g = svg("g", {class: "node" + (s.name === table.initial_state ? " initial" : ""),
+                        transform: `translate(${x},${y})`}, graph);
+    svg("rect", {x: -w / 2, y: -H / 2, width: w, height: H, rx: 9}, g);
+    svg("text", {class: "name", x: 0, y: -7}, g).textContent = s.name;
+    svg("text", {class: "sub", x: 0, y: 8}, g).textContent = info.sub;
+    svg("title", {}, g).textContent = [
+      `${s.name}${info.before ? ` (after ${info.before})` : ""}`,
+      "click to go here and pause",
+      ...info.moves.map(m => `  ${m.name} → ${fmt(m.name, m.target)}${m.delta === null ? "" : ` (${fmt(m.name, m.delta, true)})`}`),
+      info.next ? `on arrival within ±${info.eps} → ${info.next}` : "no on_arrival transition",
+    ].join("\n");
+    g.setAttribute("tabindex", 0);
+    g.setAttribute("role", "button");
+    g.setAttribute("aria-label", `go to ${s.name}`);
+    g.addEventListener("click", () => { if (!g.dataset.dragged) goToState(s.name); });
+    g.addEventListener("pointerdown", e => startDrag(e, s.name, g));
+    g.addEventListener("keydown", e => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); goToState(s.name); }
+    });
+    fsmNodes[s.name] = g;
+    grow(x - w / 2, y - H / 2, x + w / 2, y + H / 2);
+  }
+  minX -= PAD; minY -= PAD; maxX += PAD; maxY += PAD;
+  graph.setAttribute("viewBox", `${minX} ${minY} ${maxX - minX} ${maxY - minY}`);
+  graph.setAttribute("width", maxX - minX);
+  graph.setAttribute("height", maxY - minY);
+}
+
+// clicking a state pauses the choreography and sends the robot straight there, so the sliders take its target
+// With a pose on the sliders that is not in any state yet, the first click only selects the state for the
+// editor (the robot keeps the pose, ready for Update pose); clicking it again goes there.
+function showTarget(name) {  // sliders to the state's pose, so Update pose starts from it
+  for (const [joint, v] of Object.entries(fsmInfo[name]?.target ?? {})) {
+    const s = sliders[joint];
+    if (s) { s.input.value = v; s.readout.value = v.toFixed(3); }
+  }
+}
+function goToState(name) {
+  if (posed && editSel !== name) {
+    selectForEdit(name);
+    ed("msg").textContent = `kept your pose: Update pose saves it into ${name} (click ${name} again to go there instead)`;
+    return;
+  }
+  posed = false;
+  selectForEdit(null);
+  post("/state", {state: name});
+  touchedAt = performance.now();
+  setPlaying(false);
+  showTarget(name);
+}
+
+// the choreography picker: every table saved in fsm/; ones that move joints this robot lacks are greyed out
+async function loadChoreos() {
+  let list;
+  try { list = await (await fetch("/choreos")).json(); } catch { return; }
+  const sel = document.getElementById("choreo");
+  sel.replaceChildren();
+  if (!ed("file").value) ed("file").value = list.current ?? "";
+  if (!(list.current in list.choreos)) sel.add(new Option(list.current ?? "new (not saved)", "", true, true));
+  for (const [id, joints] of Object.entries(list.choreos)) {
+    const fits = joints.every(n => n in jointTypes);
+    const label = list.unsaved?.includes(id) ? `${id} (unsaved edits)` : id;
+    const option = new Option(fits ? label : `${id} (needs another robot)`, id, false, id === list.current);
+    option.disabled = !fits;
+    sel.add(option);
+  }
+  sel.add(new Option("+ Create new choreo", "+new"));  // "+" never appears in a saved identifier
+  sel.add(new Option(`+ Duplicate ${list.current ?? "this choreo"}`, "+dup"));
+}
+// slide the joints panel out of the way and back
+document.getElementById("panel-toggle").addEventListener("click", e => {
+  const hidden = document.body.classList.toggle("panel-hidden");
+  e.currentTarget.setAttribute("aria-expanded", String(!hidden));
+  e.currentTarget.title = hidden ? "show the joints panel" : "hide the joints panel";
+  e.currentTarget.innerHTML = hidden ? "&#x25C2;" : "&#x25B8;";
+});
+// the corner handle writes an inline width; from then on the graph scales with the box
+const fsmBox = document.getElementById("fsm");
+new ResizeObserver(() => fsmBox.classList.toggle("sized", !!fsmBox.style.width)).observe(fsmBox);
+document.getElementById("choreo-del").addEventListener("click", async () => {
+  const id = document.getElementById("choreo").value;
+  if (!id || id.startsWith("+")) return;
+  if (!confirm(`Delete choreo "${id}"? The file moves to fsm/.deleted/.`)) return;
+  const reply = await post("/delete", {id});
+  ed("msg").textContent = reply.result ? `deleted ${id} (still loaded; Save brings it back)` : reply.status ?? "delete failed";
+  loadChoreos();
+});
+document.getElementById("choreo").addEventListener("change", async e => {
+  if (e.target.value === "+new") return newChoreo();
+  if (e.target.value === "+dup") return duplicateChoreo();
+  posed = false;
+  const reply = await post("/choreo", {id: e.target.value});
+  if (reply.result) { touchedAt = performance.now(); setPlaying(true); ed("file").value = e.target.value; loadFsm(); }
+  loadChoreos();  // on failure this puts the selection back
+});
+
+async function loadFsm() {
+  if (fsmLoading) return;
+  fsmLoading = true;
+  try {
+    const res = await fetch("/fsm");
+    fsmRev = res.headers.get("X-Table-Rev");  // sent back with edits so a stale page cannot overwrite newer ones
+    buildFsm(await res.json());
+  } catch { /* retried on the next status */ }
+  fsmLoading = false;
+}
+
+// the card under the graph: which joints the current state moves, where they are, and how close it is
+function showDetail(changed) {
+  const info = fsmInfo[fsm.current_state];
+  if (!info) return;
+  const rows = document.getElementById("fsm-joints");
+  if (changed) {
+    document.getElementById("fsm-now").textContent = fsm.current_state;
+    document.getElementById("fsm-next").textContent = info.next ? `→ ${info.next}` : "";
+    rows.replaceChildren();
+    for (const m of info.moves.slice(0, 6)) {
+      const tr = rows.insertRow();
+      tr.dataset.joint = m.name;
+      tr.insertCell().textContent = shortJoint(m.name);
+      tr.insertCell().className = "num";
+      tr.insertCell().textContent = "→ " + fmt(m.name, m.target);
+      tr.cells[2].className = "num target";
+    }
+    const held = Object.keys(info.target).length - Math.min(info.moves.length, 6);
+    document.getElementById("fsm-held").textContent = held > 0 ? `${held} more joints holding` : "";
+  }
+  for (const tr of rows.rows) {
+    const v = jointPos[tr.dataset.joint];
+    tr.cells[1].textContent = v === undefined ? "–" : fmt(tr.dataset.joint, v);
+  }
+  // arrival: the worst joint error against the state's epsilon (the bar fills as the error closes in)
+  let worst = 0;
+  for (const [n, want] of Object.entries(info.target)) if (n in jointPos) worst = Math.max(worst, Math.abs(jointPos[n] - want));
+  const fill = worst <= info.eps ? 1 : info.eps / worst;
+  document.getElementById("fsm-bar").style.width = `${Math.round(100 * fill)}%`;
+  document.getElementById("fsm-meta").textContent =
+    `worst error ${worst.toFixed(2)} / ±${info.eps}` + (fsmLoopHead ? ` · loop ${fsmLoops}` : "")
+    + (fsm.last_transition ? ` · last: ${fsm.last_transition}` : "");
+}
+
+function showFsm() {
+  if (!fsm) return;
+  if (fsm.current_state && !fsmNodes[fsm.current_state]) return loadFsm();  // a new table was loaded
+  const changed = fsm.current_state !== prevState;
+  if (changed) {
+    fsmNodes[prevState]?.classList.remove("current");
+    for (const el of Object.values(takenEdge ?? {})) el.classList.remove("taken");
+    takenEdge = fsmEdges[`${prevState}->${fsm.current_state}`] ?? null;
+    for (const el of Object.values(takenEdge ?? {})) { el.classList.add("taken"); el.parentNode.appendChild(el); }
+    fsmNodes[fsm.current_state]?.classList.add("current");
+    if (prevState !== null && fsm.current_state === fsmLoopHead) fsmLoops++;
+    prevState = fsm.current_state;
+    fillEditor();
+  }
+  document.getElementById("fsm-mode").textContent =
+    fsm.running ? `running · ${fsm.time_in_state.toFixed(1)} s` : "paused";
+  showDetail(changed);
+}
+
 let fsm = null;
+// ---- choreography editor ------------------------------------------------------------------------------
+// Every edit changes a copy of the loaded table and sends the whole table back: the server reloads it,
+// pauses, and holds the edited state, so the robot shows the pose being worked on. Save writes fsm/<name>.json.
+const ed = id => document.getElementById("ed-" + id);
+let posed = false, editSel = null;  // the sliders hold an unrecorded pose; the state picked for editing
+const editName = () => editSel ?? fsm?.current_state;
+function selectForEdit(name) {
+  fsmNodes[editSel]?.classList.remove("selected");
+  editSel = name;
+  fsmNodes[name]?.classList.add("selected");
+  fillEditor();
+}
+const stateIn = (table, name) => table.states.find(s => s.name === name);
+const nextOf = s => s.transitions?.find(t => t.name === s.on_arrival)?.next_state ?? null;
+const sliderPose = () => {
+  const names = Object.keys(sliders);
+  return {joint_names: names, positions: names.map(n => Number(sliders[n].input.value))};
+};
+function freshName(table, base = "pose_") {
+  const taken = new Set(table.states.map(s => s.name));
+  for (let i = 1; ; i++) if (!taken.has(`${base}${i}`)) return `${base}${i}`;
+}
+// point s's on_arrival at `next` (null: the choreo stops at s)
+function setNext(s, next) {
+  s.transitions = (s.transitions ?? []).filter(t => t.name !== s.on_arrival);
+  delete s.on_arrival;
+  if (next === null || next === s.name) return;
+  let t = s.transitions.find(t => t.next_state === next);
+  if (!t) {
+    t = {name: `to_${next}`, next_state: next};
+    while (s.transitions.some(x => x.name === t.name)) t.name += "_";
+    s.transitions.push(t);
+  }
+  s.on_arrival = t.name;
+}
+async function pushEdit(table, state, done, fresh = false) {
+  const reply = await post("/edit", fresh ? {table, state, fresh} : {table, state, fresh, base_rev: fsmRev});
+  ed("msg").textContent = reply.result ? `${done} · not saved yet` : reply.status ?? "edit failed";
+  if (reply.values?.stale) loadFsm();
+  if (!reply.result) return;
+  posed = false;
+  editSel = null;  // the robot now holds `state`, so it is the current state
+  touchedAt = performance.now();
+  setPlaying(false);
+  await loadFsm();
+  loadChoreos();  // shows "(unsaved edits)" on the menu
+}
+// the state being edited, on a fresh copy of the table
+function editing() {
+  const table = fsmTable?.states && structuredClone(fsmTable), cur = table && stateIn(table, editName());
+  return cur ? [table, cur] : [];
+}
+function fillEditor() {
+  const s = fsmTable?.states && stateIn(fsmTable, editName());
+  if (!s) return;
+  ed("name").value = s.name;
+  ed("eps").value = s.epsilon ?? 0;
+  const sel = ed("next");
+  sel.replaceChildren(new Option("stop here", ""));
+  for (const x of fsmTable.states) if (x !== s) sel.add(new Option(x.name, x.name, false, x.name === nextOf(s)));
+  const swap = ed("swap");
+  swap.replaceChildren(new Option("—", ""));
+  for (const x of fsmTable.states) if (x !== s) swap.add(new Option(x.name, x.name));
+}
+
+ed("record").addEventListener("click", () => {
+  const [table, cur] = editing();
+  if (!table) return;
+  const name = freshName(table), s = {name, target: sliderPose(), epsilon: cur.epsilon ?? 0.05, transitions: []};
+  table.states.push(s);
+  setNext(s, nextOf(cur));
+  setNext(cur, name);
+  pushEdit(table, name, `recorded ${name} after ${cur.name}`);
+});
+ed("dup").addEventListener("click", () => {
+  const [table, cur] = editing();
+  if (!table) return;
+  const copy = `${cur.name} copy`, name = table.states.some(s => s.name === copy) ? freshName(table, `${copy} `) : copy;
+  const s = {name, target: structuredClone(cur.target), epsilon: cur.epsilon ?? 0.05, transitions: []};
+  table.states.splice(table.states.indexOf(cur) + 1, 0, s);
+  setNext(s, nextOf(cur));
+  setNext(cur, name);
+  pushEdit(table, name, `duplicated ${cur.name} as ${name}`);
+});
+ed("update").addEventListener("click", () => {
+  const [table, cur] = editing();
+  if (!table) return;
+  cur.target = sliderPose();
+  pushEdit(table, cur.name, `updated ${cur.name}'s pose`);
+});
+ed("delete").addEventListener("click", () => {
+  const [table, gone] = editing();
+  if (!table) return;
+  if (table.states.length < 2) return ed("msg").textContent = "a choreo needs at least one state";
+  const after = nextOf(gone);
+  table.states = table.states.filter(s => s !== gone);
+  for (const s of table.states) {  // whatever led into the deleted state now leads where it led
+    if (nextOf(s) === gone.name) setNext(s, after === gone.name ? null : after);
+    s.transitions = (s.transitions ?? []).filter(t => t.next_state !== gone.name);
+  }
+  if (table.initial_state === gone.name) table.initial_state = after && after !== gone.name ? after : table.states[0].name;
+  pushEdit(table, after && after !== gone.name ? after : table.initial_state, `deleted ${gone.name}`);
+});
+ed("name").addEventListener("change", e => {
+  const [table, cur] = editing(), name = e.target.value.trim();
+  if (!table || !name || name === cur.name) return;
+  if (stateIn(table, name)) { e.target.value = cur.name; return ed("msg").textContent = `${name} already exists`; }
+  const old = cur.name;
+  cur.name = name;
+  if (table.initial_state === old) table.initial_state = name;
+  for (const s of table.states) for (const t of s.transitions ?? []) if (t.next_state === old) t.next_state = name;
+  pushEdit(table, name, `renamed ${old} to ${name}`);
+});
+ed("eps").addEventListener("change", e => {
+  const [table, cur] = editing(), eps = Number(e.target.value);
+  if (!table || !(eps >= 0)) return;
+  cur.epsilon = eps;
+  pushEdit(table, cur.name, `${cur.name} now moves on within ±${eps}`);
+});
+// swap two states' places in the flow: each keeps its own name and pose but takes the other's incoming and
+// outgoing transitions (and the start, if either was it), so P→a→b→X becomes P→b→a→X
+function swapStates(table, a, b) {
+  const sa = stateIn(table, a), sb = stateIn(table, b), other = n => n === a ? b : n === b ? a : n;
+  for (const s of table.states) for (const t of s.transitions ?? []) t.next_state = other(t.next_state);
+  table.initial_state = other(table.initial_state);
+  [sa.transitions, sb.transitions, sa.on_arrival, sb.on_arrival] = [sb.transitions, sa.transitions, sb.on_arrival, sa.on_arrival];
+  for (const s of [sa, sb]) if (s.on_arrival === undefined) delete s.on_arrival;
+  for (const s of table.states) for (const t of s.transitions ?? []) {  // keep "to_<next>" names truthful
+    const want = `to_${t.next_state}`;
+    if (t.name.startsWith("to_") && t.name !== want && !s.transitions.some(x => x.name === want)) {
+      if (s.on_arrival === t.name) s.on_arrival = want;
+      t.name = want;
+    }
+  }
+}
+function swapInto(a, b) {
+  const table = fsmTable?.states && structuredClone(fsmTable);
+  if (!table || a === b || !stateIn(table, a) || !stateIn(table, b)) return;
+  swapStates(table, a, b);
+  pushEdit(table, fsm?.current_state ?? a, `swapped ${a} and ${b}`);
+}
+ed("swap").addEventListener("change", e => { if (e.target.value) swapInto(editName(), e.target.value); });
+
+// drag a state onto another to swap them; a press that moves under 5 px stays a click
+let drag = null;
+function startDrag(e, name, g) {
+  if (e.button === 0) drag = {name, g, x: e.clientX, y: e.clientY, moved: false, over: null, base: g.getAttribute("transform")};
+}
+addEventListener("pointermove", e => {
+  if (!drag) return;
+  const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+  if (!drag.moved && Math.hypot(dx, dy) < 5) return;
+  drag.moved = true;
+  drag.g.classList.add("dragging");
+  const k = 1 / (document.getElementById("fsm-graph").getScreenCTM()?.a || 1);  // screen px to graph units
+  drag.g.setAttribute("transform", `${drag.base} translate(${dx * k},${dy * k})`);
+  const hit = document.elementFromPoint(e.clientX, e.clientY)?.closest?.("#fsm-graph .node") ?? null;
+  if (hit !== drag.over) {
+    drag.over?.classList.remove("drop");
+    drag.over = hit;
+    hit?.classList.add("drop");
+  }
+});
+addEventListener("pointerup", () => {
+  if (!drag) return;
+  const {name, g, base, moved, over} = drag;
+  drag = null;
+  g.classList.remove("dragging");
+  g.setAttribute("transform", base);
+  over?.classList.remove("drop");
+  if (!moved) return;
+  g.dataset.dragged = "1";  // the click this release may fire is not a "go to"
+  setTimeout(() => delete g.dataset.dragged);
+  const target = Object.keys(fsmNodes).find(n => fsmNodes[n] === over);
+  if (target) swapInto(name, target);
+});
+
+ed("next").addEventListener("change", e => {
+  const [table, cur] = editing();
+  if (!table) return;
+  setNext(cur, e.target.value || null);
+  pushEdit(table, cur.name, e.target.value ? `${cur.name} then goes to ${e.target.value}` : `${cur.name} now ends the choreo`);
+});
+// save the loaded choreo (unsaved edits included) as <name>_copy, <name>_copy2, ... and carry on editing the copy
+async function duplicateChoreo() {
+  if (!fsmTable?.states?.length) { ed("msg").textContent = "no choreo loaded to duplicate"; return loadChoreos(); }
+  let list;
+  try { list = await (await fetch("/choreos")).json(); } catch { return loadChoreos(); }
+  const base = (list.current ?? "choreo").slice(0, 57) + "_copy";  // identifiers are at most 64 characters
+  let id = base;
+  for (let i = 2; id in list.choreos; i++) id = base + i;
+  const reply = await post("/save", {id, table: fsmTable, base_rev: fsmRev});
+  if (reply.values?.stale) loadFsm();
+  ed("msg").textContent = reply.result ? `duplicated as fsm/${id}.json: edits now go into the copy` : reply.status ?? "duplicate failed";
+  if (reply.result) ed("file").value = id;
+  loadChoreos();  // selects the copy (or puts the menu back on failure)
+}
+
+// a one-state choreo from the sliders' pose, named on Save
+function newChoreo() {
+  ed("file").value = "";
+  pushEdit({initial_state: "pose_1", states: [{name: "pose_1", target: sliderPose(), epsilon: 0.05, transitions: []}]},
+           "pose_1", "new choreo from this pose: record more poses, then name it and Save", true);
+}
+ed("save").addEventListener("click", async () => {
+  const id = ed("file").value.trim();
+  const reply = await post("/save", {id, table: fsmTable, base_rev: fsmRev});
+  if (reply.values?.stale) loadFsm();
+  ed("msg").textContent = reply.result ? `saved fsm/${id}.json` : reply.status ?? "save failed";
+  if (reply.result) loadChoreos();
+});
+
+loadFsm();
 const events = new EventSource("/stream");
 events.addEventListener("xform", e => onXform(JSON.parse(e.data)));
+events.addEventListener("table", async e => {  // changed elsewhere (another tab, a script)
+  if (JSON.parse(e.data) === fsmRev) return;
+  await loadFsm();
+  if (!posed && !fsm?.running) showTarget(editName());  // paused sliders do not follow the robot, so match them here
+});
 events.addEventListener("joints", e => onJointStates(JSON.parse(e.data)));
 events.addEventListener("fsm", e => {
   fsm = JSON.parse(e.data);
-  const box = document.getElementById("running");
-  if (document.activeElement !== box && performance.now() - touchedAt > 1000) box.checked = fsm.running;
+  if (performance.now() - touchedAt > 1000) setPlaying(fsm.running);
+  showFsm();
 });
 setInterval(() => {
   const n = Object.keys(links).length;
@@ -261,7 +924,7 @@ addEventListener("resize", () => {
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
 });
-(function animate() { requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera); })();
+(function animate(now) { requestAnimationFrame(animate); glide(now ?? performance.now()); controls.update(); renderer.render(scene, camera); })();
 </script>
 </body>
 </html>

@@ -8,7 +8,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 import param_server  # noqa: E402
 from finite_state_machine import FiniteStateMachine  # noqa: E402
-from joint_state_publisher import MAX_SPEED, JointStatePublisher  # noqa: E402
+from joint_state_publisher import MAX_ACCEL, MAX_SPEED, JointStatePublisher  # noqa: E402
 from registry import Registry  # noqa: E402
 from test_fk import CHAIN_URDF  # noqa: E402  (j1 revolute [-3, 3], j2 fixed, j3 prismatic [-1, 1])
 from urdf import parse_urdf  # noqa: E402
@@ -41,15 +41,18 @@ class JointStatePublisherTest(unittest.TestCase):
 
     def test_moves_at_capped_speed_and_clamps_to_limits(self):
         self.load()
-        self.registry.publish("/joint_trajectory", trajectory(["j1", "j3"], [0.25, 5.0]))
-        self.jsp.step(0.1)
-        self.assertAlmostEqual(self.jsp.positions["j1"], MAX_SPEED * 0.1)
-        for _ in range(50):
-            self.jsp.step(0.1)
-        self.assertEqual(self.jsp.positions, {"j1": 0.25, "j3": 1.0})  # j3 stops at its upper limit
+        self.registry.publish("/joint_trajectory", trajectory(["j1", "j3"], [2.0, 5.0]))
+        self.jsp.step(0.01)  # from rest, acceleration limits the first move
+        self.assertAlmostEqual(self.jsp.positions["j1"], MAX_ACCEL * 0.01 * 0.01)
+        last = self.jsp.positions["j1"]
+        for _ in range(500):
+            self.jsp.step(0.01)
+            self.assertLessEqual(abs(self.jsp.positions["j1"] - last), MAX_SPEED * 0.01 + 1e-9)
+            last = self.jsp.positions["j1"]
+        self.assertEqual(self.jsp.positions, {"j1": 2.0, "j3": 1.0})  # j3 stops at its upper limit
         self.jsp.publish()
         self.assertEqual(dict(zip(self.states.msgs[-1]["name"], self.states.msgs[-1]["position"])),
-                         {"j1": 0.25, "j3": 1.0})
+                         {"j1": 2.0, "j3": 1.0})
 
     def test_setpoint_that_arrives_before_the_robot_still_applies(self):
         self.registry.publish("/joint_trajectory", trajectory(["j1"], [0.05]))
@@ -58,6 +61,20 @@ class JointStatePublisherTest(unittest.TestCase):
         self.load()
         self.jsp.step(0.1)
         self.assertAlmostEqual(self.jsp.positions["j1"], 0.05)
+
+    def test_keeps_its_speed_when_the_target_changes_mid_move(self):
+        self.load()
+        self.registry.publish("/joint_trajectory", trajectory(["j1"], [2.0]))
+        self.jsp.step(0.2)
+        speed = self.jsp.velocities["j1"]
+        self.assertGreater(speed, 0)
+        self.registry.publish("/joint_trajectory", trajectory(["j1"], [-2.0]))
+        self.jsp.step(0.01)  # turning around takes time: still moving forward, a little slower
+        self.assertGreater(self.jsp.velocities["j1"], 0)
+        self.assertAlmostEqual(self.jsp.velocities["j1"], speed - MAX_ACCEL * 0.01)
+        for _ in range(100):
+            self.jsp.step(0.1)
+        self.assertEqual((self.jsp.positions["j1"], self.jsp.velocities["j1"]), (-2.0, 0.0))
 
     def test_reset_goes_to_middle_of_limits(self):
         self.load(CHAIN_URDF.replace('lower="-1" upper="1"', 'lower="0" upper="0.5"'))
@@ -119,6 +136,27 @@ class FiniteStateMachineTest(unittest.TestCase):
         self.call("set_running", {"data": True})
         self.assertFalse(self.call("fire_transition", {"transition": "to_home"})[0])  # not a transition of home
         self.assertEqual(self.call("fire_transition", {"transition": "to_wave"})[1], {"current_state": "wave"})
+
+    def test_resuming_resends_the_current_target(self):
+        self.call("update_logic", TABLE)
+        self.call("set_running", {"data": False})
+        self.registry.publish("/joint_trajectory", trajectory(["j1"], [0.5]))  # e.g. a slider while stopped
+        self.call("set_running", {"data": True})
+        self.assertEqual(self.trajectories.msgs[-1], trajectory(["j1"], [0.0]))
+        count = len(self.trajectories.msgs)
+        self.call("set_running", {"data": True})  # already running: nothing re-sent
+        self.assertEqual(len(self.trajectories.msgs), count)
+
+    def test_set_state_jumps_anywhere_without_changing_running(self):
+        self.assertFalse(self.call("set_state", {"state": "wave"})[0])  # no table yet
+        self.call("update_logic", TABLE)
+        self.call("set_running", {"data": False})
+        self.assertEqual(self.call("set_state", {"state": "wave"})[1], {"current_state": "wave"})
+        self.assertEqual(self.trajectories.msgs[-1], trajectory(["j1"], [0.8]))
+        self.assertFalse(self.fsm.running)
+        for bad in ({"state": "nowhere"}, {}, None):
+            self.assertFalse(self.call("set_state", bad)[0], bad)
+        self.assertEqual(self.fsm.current["name"], "wave")
 
     def test_save_load_list_and_identifiers_cannot_escape_the_directory(self):
         self.assertTrue(self.call("save_to_file", dict(TABLE, identifier="wave_1"))[0])

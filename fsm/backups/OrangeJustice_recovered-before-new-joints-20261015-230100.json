@@ -1,0 +1,544 @@
+{
+  "initial_state": "Start",
+  "states": [
+    {
+      "name": "Start",
+      "target": {
+        "joint_names": [
+          "drive_x",
+          "drive_y",
+          "drive_yaw",
+          "ankle_roll",
+          "torso_lift_z",
+          "waist_pitch",
+          "waist_roll",
+          "waist_yaw",
+          "left_shoulder_pitch",
+          "left_shoulder_roll",
+          "left_shoulder_yaw",
+          "left_elbow_pitch",
+          "left_elbow_roll",
+          "left_wrist_roll",
+          "left_wrist_yaw",
+          "right_shoulder_pitch",
+          "right_shoulder_roll",
+          "right_shoulder_yaw",
+          "right_elbow_pitch",
+          "right_elbow_roll",
+          "right_wrist_roll",
+          "right_wrist_yaw"
+        ],
+        "positions": [
+          0,
+          0,
+          0,
+          0,
+          0.15,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "epsilon": 0.05,
+      "transitions": [
+        {
+          "name": "to_pose_3",
+          "next_state": "Move 1"
+        }
+      ],
+      "on_arrival": "to_pose_3"
+    },
+    {
+      "name": "pose_2",
+      "target": {
+        "joint_names": [
+          "drive_x",
+          "drive_y",
+          "drive_yaw",
+          "torso_lift_z",
+          "waist_pitch",
+          "waist_yaw",
+          "left_shoulder_pitch",
+          "left_shoulder_roll",
+          "left_shoulder_yaw",
+          "left_elbow_pitch",
+          "left_elbow_roll",
+          "left_wrist_roll",
+          "left_wrist_yaw",
+          "right_shoulder_pitch",
+          "right_shoulder_roll",
+          "right_shoulder_yaw",
+          "right_elbow_pitch",
+          "right_elbow_roll",
+          "right_wrist_roll",
+          "right_wrist_yaw"
+        ],
+        "positions": [
+          0,
+          0,
+          5e-16,
+          0.15,
+          0,
+          0,
+          -3.14,
+          1.64785229582171,
+          -1.4,
+          -1.25,
+          -0.4,
+          0,
+          0,
+          -3.14,
+          -1.648,
+          1.6,
+          -1.25,
+          0.4,
+          0,
+          0
+        ]
+      },
+      "epsilon": 0.05,
+      "transitions": []
+    },
+    {
+      "name": "Move 1",
+      "target": {
+        "joint_names": [
+          "drive_x",
+          "drive_y",
+          "drive_yaw",
+          "ankle_roll",
+          "torso_lift_z",
+          "waist_pitch",
+          "waist_roll",
+          "waist_yaw",
+          "left_shoulder_pitch",
+          "left_shoulder_roll",
+          "left_shoulder_yaw",
+          "left_elbow_pitch",
+          "left_elbow_roll",
+          "left_wrist_roll",
+          "left_wrist_yaw",
+          "right_shoulder_pitch",
+          "right_shoulder_roll",
+          "right_shoulder_yaw",
+          "right_elbow_pitch",
+          "right_elbow_roll",
+          "right_wrist_roll",
+          "right_wrist_yaw"
+        ],
+        "positions": [
+          0,
+          0,
+          0,
+          -0.211343917536427,
+          0.0542316833729462,
+          -0.0533500006889188,
+          0.397257307361097,
+          0,
+          -0.459156293961627,
+          -0.372800714753195,
+          -1.4,
+          -1.07922831008233,
+          -0.0427449295580588,
+          0,
+          1.26189524956081,
+          -0.942581378526403,
+          0.723850212186973,
+          0.573214916124143,
+          -0.542698282870036,
+          0.751120395094899,
+          -0.703505790017568,
+          1.35366157934622
+        ]
+      },
+      "epsilon": 0.01,
+      "transitions": [
+        {
+          "name": "to_pose_1",
+          "next_state": "Move 2"
+        }
+      ],
+      "on_arrival": "to_pose_1"
+    },
+    {
+      "name": "Move 2",
+      "target": {
+        "joint_names": [
+          "drive_x",
+          "drive_y",
+          "drive_yaw",
+          "ankle_roll",
+          "torso_lift_z",
+          "waist_pitch",
+          "waist_roll",
+          "waist_yaw",
+          "left_shoulder_pitch",
+          "left_shoulder_roll",
+          "left_shoulder_yaw",
+          "left_elbow_pitch",
+          "left_elbow_roll",
+          "left_wrist_roll",
+          "left_wrist_yaw",
+          "right_shoulder_pitch",
+          "right_shoulder_roll",
+          "right_shoulder_yaw",
+          "right_elbow_pitch",
+          "right_elbow_roll",
+          "right_wrist_roll",
+          "right_wrist_yaw"
+        ],
+        "positions": [
+          0,
+          0,
+          0,
+          -0.207015317074851,
+          0.0542316833729462,
+          0.143601320312769,
+          0.324320389583549,
+          0,
+          -0.473440675484827,
+          0.199873126313252,
+          -0.2055003069133,
+          -2.17003562639937,
+          -0.12931693878957,
+          0,
+          -3.14007498983845,
+          -0.314364608521925,
+          -0.206582457028694,
+          -0.531011061623781,
+          -2.46524617787882,
+          0.751120395094899,
+          0.176931543866901,
+          -3.14159
+        ]
+      },
+      "epsilon": 0.01,
+      "transitions": [
+        {
+          "name": "to_pose_1",
+          "next_state": "Move 3"
+        }
+      ],
+      "on_arrival": "to_pose_1"
+    },
+    {
+      "name": "Move 3",
+      "target": {
+        "joint_names": [
+          "drive_x",
+          "drive_y",
+          "drive_yaw",
+          "ankle_roll",
+          "torso_lift_z",
+          "waist_pitch",
+          "waist_roll",
+          "waist_yaw",
+          "left_shoulder_pitch",
+          "left_shoulder_roll",
+          "left_shoulder_yaw",
+          "left_elbow_pitch",
+          "left_elbow_roll",
+          "left_wrist_roll",
+          "left_wrist_yaw",
+          "right_shoulder_pitch",
+          "right_shoulder_roll",
+          "right_shoulder_yaw",
+          "right_elbow_pitch",
+          "right_elbow_roll",
+          "right_wrist_roll",
+          "right_wrist_yaw"
+        ],
+        "positions": [
+          0,
+          0,
+          0,
+          0.434483271330647,
+          0.0542316833729462,
+          0.143601320312769,
+          -0.781204168302849,
+          0,
+          -0.473440675484827,
+          1.66250722227963,
+          -1.29955407357652,
+          -1.33007070683063,
+          -0.694415729048259,
+          -0.817131552133926,
+          1.09134839137474,
+          -0.314364608521925,
+          -0.206582457028694,
+          1.86118998346595,
+          -0.509584489338983,
+          0.711730130894561,
+          0.992656300850815,
+          1.06277962832834
+        ]
+      },
+      "epsilon": 0.01,
+      "transitions": [
+        {
+          "name": "to_pose_1",
+          "next_state": "Move 4"
+        }
+      ],
+      "on_arrival": "to_pose_1"
+    },
+    {
+      "name": "Move 4",
+      "target": {
+        "joint_names": [
+          "drive_x",
+          "drive_y",
+          "drive_yaw",
+          "ankle_roll",
+          "torso_lift_z",
+          "waist_pitch",
+          "waist_roll",
+          "waist_yaw",
+          "left_shoulder_pitch",
+          "left_shoulder_roll",
+          "left_shoulder_yaw",
+          "left_elbow_pitch",
+          "left_elbow_roll",
+          "left_wrist_roll",
+          "left_wrist_yaw",
+          "right_shoulder_pitch",
+          "right_shoulder_roll",
+          "right_shoulder_yaw",
+          "right_elbow_pitch",
+          "right_elbow_roll",
+          "right_wrist_roll",
+          "right_wrist_yaw"
+        ],
+        "positions": [
+          0,
+          0,
+          0,
+          -0.304408827460301,
+          0.0542316833729462,
+          0.0784558833660571,
+          0.5807899669319,
+          0,
+          -1.41772486617753,
+          0.374315724914746,
+          -0.883791999242189,
+          0.28687799559092,
+          -0.303110247321828,
+          -0.478418566015638,
+          3.14159,
+          -0.911711472219352,
+          -0.748306804794874,
+          -1.35669159966932,
+          -0.532742501808412,
+          0.349859132306844,
+          -0.0620072016120699,
+          0.937466644965727
+        ]
+      },
+      "epsilon": 0.01,
+      "transitions": [
+        {
+          "name": "to_pose_1",
+          "next_state": "Move 5"
+        }
+      ],
+      "on_arrival": "to_pose_1"
+    },
+    {
+      "name": "Move 5",
+      "target": {
+        "joint_names": [
+          "drive_x",
+          "drive_y",
+          "drive_yaw",
+          "ankle_roll",
+          "torso_lift_z",
+          "waist_pitch",
+          "waist_roll",
+          "waist_yaw",
+          "left_shoulder_pitch",
+          "left_shoulder_roll",
+          "left_shoulder_yaw",
+          "left_elbow_pitch",
+          "left_elbow_roll",
+          "left_wrist_roll",
+          "left_wrist_yaw",
+          "right_shoulder_pitch",
+          "right_shoulder_roll",
+          "right_shoulder_yaw",
+          "right_elbow_pitch",
+          "right_elbow_roll",
+          "right_wrist_roll",
+          "right_wrist_yaw"
+        ],
+        "positions": [
+          0,
+          0,
+          0,
+          -0.159184281974441,
+          0.0542316833729462,
+          0.863231147049706,
+          0.254846352175261,
+          0,
+          -2.00879525920568,
+          1.36318450036168,
+          0.0349534487272227,
+          1.55927010127106,
+          -0.427557510592126,
+          -1.24046867727602,
+          0.319342499052737,
+          -0.120876167889498,
+          -0.144034180358927,
+          -0.928160153973339,
+          -1.77115509386518,
+          0.181693004374634,
+          0.998932771520099,
+          -1.8769893751507
+        ]
+      },
+      "epsilon": 0.01,
+      "transitions": [
+        {
+          "name": "to_pose_1",
+          "next_state": "Move 6"
+        }
+      ],
+      "on_arrival": "to_pose_1"
+    },
+    {
+      "name": "Move 6",
+      "target": {
+        "joint_names": [
+          "drive_x",
+          "drive_y",
+          "drive_yaw",
+          "ankle_roll",
+          "torso_lift_z",
+          "waist_pitch",
+          "waist_roll",
+          "waist_yaw",
+          "left_shoulder_pitch",
+          "left_shoulder_roll",
+          "left_shoulder_yaw",
+          "left_elbow_pitch",
+          "left_elbow_roll",
+          "left_wrist_roll",
+          "left_wrist_yaw",
+          "right_shoulder_pitch",
+          "right_shoulder_roll",
+          "right_shoulder_yaw",
+          "right_elbow_pitch",
+          "right_elbow_roll",
+          "right_wrist_roll",
+          "right_wrist_yaw"
+        ],
+        "positions": [
+          0,
+          0,
+          0,
+          0.425393210361338,
+          0.0542316833729462,
+          0.4675970648617,
+          -0.59680578863973,
+          -0.359598483345389,
+          -0.559363394647102,
+          0.780771308256691,
+          -1.2222885553374,
+          -0.470194225138645,
+          -0.364143513830044,
+          0.921667253280975,
+          2.61263502359547,
+          0.688572118425132,
+          -0.170655073197616,
+          0.331895440391306,
+          -1.77115509386518,
+          0.181693004374634,
+          -0.56845345561641,
+          1.74994495160346
+        ]
+      },
+      "epsilon": 0.01,
+      "transitions": [
+        {
+          "name": "to_pose_1",
+          "next_state": "pose_1"
+        }
+      ],
+      "on_arrival": "to_pose_1"
+    },
+    {
+      "name": "pose_1",
+      "target": {
+        "joint_names": [
+          "drive_x",
+          "drive_y",
+          "drive_yaw",
+          "ankle_roll",
+          "torso_lift_z",
+          "waist_pitch",
+          "waist_roll",
+          "waist_yaw",
+          "left_shoulder_pitch",
+          "left_shoulder_roll",
+          "left_shoulder_yaw",
+          "left_elbow_pitch",
+          "left_elbow_roll",
+          "left_wrist_roll",
+          "left_wrist_yaw",
+          "right_shoulder_pitch",
+          "right_shoulder_roll",
+          "right_shoulder_yaw",
+          "right_elbow_pitch",
+          "right_elbow_roll",
+          "right_wrist_roll",
+          "right_wrist_yaw"
+        ],
+        "positions": [
+          0,
+          0,
+          0,
+          0.425393210361338,
+          0.0542316833729462,
+          0.4675970648617,
+          -0.59680578863973,
+          -0.359598483345389,
+          -0.559363394647102,
+          0.780771308256691,
+          -1.2222885553374,
+          -0.470194225138645,
+          -0.364143513830044,
+          0.921667253280975,
+          2.61263502359547,
+          0.688572118425132,
+          -0.170655073197616,
+          0.331895440391306,
+          -1.77115509386518,
+          0.181693004374634,
+          -0.56845345561641,
+          1.74994495160346
+        ]
+      },
+      "epsilon": 0.05,
+      "transitions": [
+        {
+          "name": "to_pose_2",
+          "next_state": "pose_2"
+        }
+      ],
+      "on_arrival": "to_pose_2"
+    }
+  ]
+}

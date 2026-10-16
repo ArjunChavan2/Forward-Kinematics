@@ -76,6 +76,7 @@ class FiniteStateMachine:
         registry.subscribe(self, JOINT_STATES_TOPIC)
         for name, handler in (("update_logic", self.update_logic), ("get_logic", self.get_logic),
                               ("set_running", self.set_running), ("fire_transition", self.fire_transition),
+                              ("set_state", self.set_state),
                               ("save_to_file", self.save_to_file), ("load_from_file", self.load_from_file),
                               ("list_saved", self.list_saved)):
             registry.register_handler(f"/fsm/{name}", handler)
@@ -152,6 +153,8 @@ class FiniteStateMachine:
         if data is not None:
             if not isinstance(data, bool):
                 return False, {"running": self.running}, "data must be true or false"
+            if data and not self.running and self.current is not None:
+                self._enter(self.current["name"])  # the joints may have been moved while stopped
             self.running = data
         return True, {"running": self.running}, ""
 
@@ -162,6 +165,15 @@ class FiniteStateMachine:
         if not self._take(name):
             return False, {}, f"state {self.current['name']!r} has no transition {name!r}"
         return True, {"current_state": self.current["name"]}, ""
+
+    def set_state(self, args: Any) -> tuple[bool, dict, str]:
+        """Jump straight to any state (the viewer's click-to-go). Works while stopped too: the robot moves there and waits."""
+        name = args.get("state") if isinstance(args, dict) else None
+        if self.table is None or not any(s["name"] == name for s in self.table["states"]):
+            return False, {}, f"no state {name!r}"
+        self.last_transition = None
+        self._enter(name)
+        return True, {"current_state": name}, ""
 
     def _path(self, args: Any) -> str | None:
         identifier = args.get("identifier") if isinstance(args, dict) else None

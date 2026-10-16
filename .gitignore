@@ -2,3 +2,9 @@ __pycache__/
 *.pyc
 .DS_Store
 submission.tar.gz
+.unsaved_choreos.json
+.unsaved_choreos.json.tmp
+fsm/.deleted/
+.venv-pose/
+*.mov
+*.mp4

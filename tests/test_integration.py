@@ -5,6 +5,7 @@ import os
 import socket
 import subprocess
 import sys
+import tempfile
 import time
 import unittest
 
@@ -332,6 +333,7 @@ class DemoWireTest(ServerTestCase):
         from http.server import ThreadingHTTPServer
         import live_viewer
 
+        live_viewer.UNSAVED_PATH = os.path.join(tempfile.mkdtemp(), "unsaved.json")  # not the user's drafts
         server = ThreadingHTTPServer(("127.0.0.1", 0), live_viewer.Handler)
         threading.Thread(target=server.serve_forever, daemon=True).start()
         self.addCleanup(server.shutdown)
@@ -343,13 +345,67 @@ class DemoWireTest(ServerTestCase):
 
         self.client.subscribe("/tf")
         self.load_robot(CHAIN_URDF.replace('<link name="link1"/>', '<link name="link1"><visual><geometry>'
-                                           '<box size="0.1 0.2 0.3"/></geometry></visual></link>'))
+                                           '<box size="0.1 0.2 0.3"/></geometry></visual><visual>'
+                                           '<geometry><sphere radius="0.05"/></geometry>'
+                                           '<material name="red"><color rgba="1 0 0 1"/></material>'
+                                           '</visual></link>'))
         self.recv("/tf")
         robot = json.loads(urllib.request.urlopen(base + "/robot", timeout=5).read())
         self.assertEqual([(j["name"], j["lower"], j["upper"]) for j in robot["joints"] if j["type"] != "fixed"],
                          [("j1", -3.0, 3.0), ("j3", -1.0, 1.0)])
-        self.assertEqual(robot["visuals"], {"link1": {"xyz": [0.0, 0.0, 0.0], "rpy": [0.0, 0.0, 0.0],
-                                                      "type": "box", "size": [0.1, 0.2, 0.3]}})
+        origin = {"xyz": [0.0, 0.0, 0.0], "rpy": [0.0, 0.0, 0.0]}
+        self.assertEqual(robot["visuals"], {"link1": [{**origin, "type": "box", "size": [0.1, 0.2, 0.3]},
+                                                      {**origin, "type": "sphere", "size": [0.05, 0.0],
+                                                       "color": [1.0, 0.0, 0.0]}]})
+        get = lambda path: json.loads(urllib.request.urlopen(base + path, timeout=5).read())  # noqa: E731
+        rev = lambda: urllib.request.urlopen(base + "/fsm", timeout=5).headers["X-Table-Rev"]  # noqa: E731
+        self.assertEqual(get("/fsm"), {})
+        self.assertEqual(get("/choreos")["choreos"]["sample_swing"], ["shoulder"])  # the repo's fsm/ directory
+        self.assertTrue(post("/choreo", {"id": "sample_swing"})["result"])
+        self.assertEqual((get("/fsm")["initial_state"], get("/choreos")["current"]), ("left", "sample_swing"))
+        self.assertFalse(post("/choreo", {"id": "../escape"})["result"])
+        two = {"initial_state": "a", "states": [
+            {"name": "a", "target": {"joint_names": ["j1"], "positions": [0.0]}, "on_arrival": "go",
+             "transitions": [{"name": "go", "next_state": "b"}]},
+            {"name": "b", "target": {"joint_names": ["j1"], "positions": [0.3]}}]}
+        self.assertTrue(post("/edit", {"table": two, "state": "b", "fresh": True})["result"])
+        self.assertEqual(self.client.call_service("/fsm/set_running", {})["values"], {"running": False})
+        self.assertEqual((get("/fsm"), get("/choreos")["current"]), (two, None))
+        saved = os.path.join(SRC, "..", "fsm", "zz_test_choreo.json")
+        self.addCleanup(lambda: os.path.exists(saved) and os.remove(saved))
+        self.assertTrue(post("/save", {"id": "zz_test_choreo", "table": two, "base_rev": rev()})["result"])
+        self.assertEqual((get("/choreos")["choreos"]["zz_test_choreo"], get("/choreos")["current"]), (["j1"], "zz_test_choreo"))
+        edited = {**two, "initial_state": "b"}  # an unsaved edit survives switching away and back
+        self.assertTrue(post("/edit", {"table": edited, "state": "b", "fresh": False, "base_rev": rev()})["result"])
+        self.assertEqual(get("/choreos")["unsaved"], ["zz_test_choreo"])
+        old = rev()  # a page edited at `old`...
+        self.assertTrue(post("/edit", {"table": two, "state": "a", "fresh": False, "base_rev": old})["result"])
+        stale = post("/edit", {"table": edited, "state": "b", "fresh": False, "base_rev": old})  # ...then edits again
+        self.assertEqual((stale["values"], get("/fsm")), ({"stale": True}, two))
+        self.assertFalse(post("/save", {"id": "zz_test_choreo", "table": edited, "base_rev": old})["result"])
+        self.assertFalse(post("/edit", {"table": edited, "state": "b", "fresh": False})["result"])  # no rev: refused
+        self.assertTrue(post("/edit", {"table": edited, "state": "b", "fresh": False, "base_rev": rev()})["result"])
+        self.assertTrue(post("/choreo", {"id": "sample_swing"})["result"])
+        self.assertTrue(post("/choreo", {"id": "zz_test_choreo"})["result"])
+        self.assertEqual(get("/fsm"), edited)
+        with open(live_viewer.UNSAVED_PATH) as f:  # on disk too, so a restart keeps it
+            self.assertEqual(json.load(f), {"zz_test_choreo": edited})
+        self.assertTrue(post("/save", {"id": "zz_test_choreo", "table": edited, "base_rev": rev()})["result"])
+        self.assertEqual(get("/choreos")["unsaved"], [])
+        self.assertTrue(post("/delete", {"id": "zz_test_choreo"})["result"])  # moved to fsm/.deleted/, still loaded
+        self.assertNotIn("zz_test_choreo", get("/choreos")["choreos"])
+        self.assertEqual((get("/choreos")["current"], get("/fsm")), (None, edited))
+        trash = os.path.join(SRC, "..", "fsm", ".deleted")
+        for name in os.listdir(trash):
+            if name.startswith("zz_test_choreo-"):
+                os.remove(os.path.join(trash, name))
+        self.assertFalse(post("/delete", {"id": "zz_test_choreo"})["result"])
+        self.assertFalse(post("/delete", {"id": "../escape"})["result"])
+        self.assertFalse(post("/save", {"id": "zz_bad", "table": {"states": []}, "base_rev": rev()})["result"])
+        self.assertFalse(post("/save", {"id": "../escape", "table": two, "base_rev": rev()})["result"])
+        table ={"initial_state": "a", "states": [{"name": "a", "target": {"joint_names": ["j1"], "positions": [0.0]}}]}
+        self.assertTrue(self.client.call_service("/fsm/update_logic", table)["result"])
+        self.assertEqual(get("/fsm")["states"][0]["name"], "a")
         self.client.call_service("/fsm/set_running", {"data": True})
         post("/setpoint", {"name": ["j1"], "position": [0.5]})
         self.assertEqual(self.client.call_service("/fsm/set_running", {})["values"], {"running": False})
