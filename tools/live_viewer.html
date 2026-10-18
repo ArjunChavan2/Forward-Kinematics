@@ -270,6 +270,61 @@ function buildBody(robot) {
   }
 }
 
+// ---- outfits: a shirt over the torso that matches the loaded choreo (viewer only, not in the URDF) ----------
+const OUTFITS = {  // choreo identifier prefix -> shirt
+  scuba: {color: "#00274c", ink: "#ffcb05", tank: true, front: ["MICHIGAN", "23"], back: ["LENDEBORG", "23"]},  // UM basketball jersey
+  OrangeJustice: {color: "#ff7a00", sleeves: true},  // plain orange tee
+};
+const outfitParts = {}, worn = [];
+const fabric = (color, map) => new THREE.MeshStandardMaterial({color: map ? 0xffffff : new THREE.Color(color).convertSRGBToLinear(),
+                                                              map, transparent: !!map, roughness: 0.9, metalness: 0});
+function lettering([word, number], ink) {  // name over number, on a transparent square
+  const c = Object.assign(document.createElement("canvas"), {width: 512, height: 512}), g = c.getContext("2d");
+  g.fillStyle = ink; g.textAlign = "center"; g.textBaseline = "middle";
+  g.font = 'bold 70px Impact, "Arial Black", sans-serif'; g.fillText(word, 256, 110, 470);
+  g.font = 'bold 270px Impact, "Arial Black", sans-serif'; g.fillText(number, 256, 335);
+  const t = new THREE.CanvasTexture(c);
+  t.encoding = THREE.sRGBEncoding;
+  return t;
+}
+// a flat print on the shirt facing `normal` (+x front, -x back), its text upright and read from that side
+function print(text, ink, normal) {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(0.22, 0.22), fabric(null, lettering(text, ink)));
+  m.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(
+    new THREE.Vector3(0, normal, 0), new THREE.Vector3(0, 0, 1), new THREE.Vector3(normal, 0, 0)));
+  m.position.set(normal * 0.1275, 0, 0.25);
+  return m;
+}
+function outfitFor(key) {  // [link, mesh] pairs, built once per outfit
+  if (outfitParts[key]) return outfitParts[key];
+  const o = OUTFITS[key], cloth = fabric(o.color), parts = [];
+  const add = (link, size, xyz, material = cloth) => {
+    const m = mesh(new THREE.BoxGeometry(...size), material);
+    m.position.set(...xyz);
+    parts.push([link, m]);
+  };
+  // just over the torso box (0.22 x 0.34 x 0.34, z 0.10 to 0.44); sizes differ a little so faces never coincide
+  if (o.tank) {  // body below the shoulders, a strap over each, trimmed in the ink color at the neck and armholes
+    const trim = fabric(o.ink);
+    add("torso", [0.252, 0.356, 0.25], [0, 0, 0.235]);
+    add("torso", [0.254, 0.356, 0.014], [0, 0, 0.353], trim);
+    for (const y of [-0.115, 0.115]) {
+      add("torso", [0.254, 0.091, 0.092], [0, y, 0.399], trim);
+      add("torso", [0.258, 0.075, 0.094], [0, y, 0.4]);
+    }
+  } else add("torso", [0.252, 0.356, 0.32], [0, 0, 0.28]);
+  if (o.front) parts.push(["torso", print(o.front, o.ink, 1)], ["torso", print(o.back, o.ink, -1)]);
+  if (o.sleeves) for (const side of ["left", "right"]) {
+    add(`${side}_upper_arm`, [0.09, 0.09, 0.1], [0, 0, -0.07]);  // over the top of the upper arm
+  }
+  return outfitParts[key] = parts;
+}
+function dress(choreo) {
+  for (const m of worn.splice(0)) m.removeFromParent();
+  const key = Object.keys(OUTFITS).find(k => choreo?.startsWith(k));
+  if (key) for (const [link, m] of outfitFor(key)) if (links[link]) { links[link].add(m); worn.push(m); }
+}
+
 // ---- sliders -----------------------------------------------------------------------------------------
 let pending = {}, timer = null, needSync = true, touchedAt = 0;
 const playBtn = document.getElementById("running");
@@ -580,6 +635,7 @@ function goToState(name) {
 async function loadChoreos() {
   let list;
   try { list = await (await fetch("/choreos")).json(); } catch { return; }
+  dress(list.current);
   const sel = document.getElementById("choreo");
   sel.replaceChildren();
   if (!ed("file").value) ed("file").value = list.current ?? "";
@@ -914,6 +970,7 @@ events.addEventListener("xform", e => onXform(JSON.parse(e.data)));
 events.addEventListener("table", async e => {  // changed elsewhere (another tab, a script)
   if (JSON.parse(e.data) === fsmRev) return;
   await loadFsm();
+  loadChoreos();  // the loaded choreo may have changed too: menu and outfit
   if (!posed && !fsm?.running) showTarget(editName());  // paused sliders do not follow the robot, so match them here
 });
 events.addEventListener("joints", e => onJointStates(JSON.parse(e.data)));
