@@ -29,6 +29,14 @@ For a fresh session starting directly in this repo. Full plan/history: `PLAN.md`
 - `README.md`'s "Layout"/"Workflow" sections are stale (say "no Project 3 nodes yet") — trust PLAN.md's
   "Repository observations" and commit log over README for current status.
 
+## Autograder test rules (2026-10-27)
+
+- The grader runs our tests while its own `make run` holds 9095. `tests/test_integration.py` now
+  starts `src/main.py` on a free port (`client_helper.PORT` passed as `GATEWAY_PORT`; gateway
+  default stays 9095). `make test` runs `tests/run_tests.py`, documented in `tests/README.md`
+  (the grader requires it). Same fix as Projects 1 and 2; see `spec/submission_layout.md`,
+  "The grader runs your tests while `make run` is up". Keep both rules for any new test.
+
 ## Next step
 
 Implement `src/fk.py` per its existing docstrings and PLAN.md's math section (`T_joint = T_origin · T_motion(q)`,

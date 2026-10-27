@@ -1,4 +1,4 @@
-"""Over-the-wire tests: start `src/main.py` (what `make run` runs) and talk to it on 127.0.0.1:9095."""
+"""Over-the-wire tests: start `src/main.py` (what `make run` runs) on a free port (GATEWAY_PORT) and talk to it."""
 import json
 import math
 import os
@@ -54,7 +54,7 @@ class ServerTestCase(unittest.TestCase):
     def setUp(self) -> None:
         self.started = time.monotonic()
         self.proc = subprocess.Popen([sys.executable, os.path.join(SRC, "main.py"), *self.ARGS],
-                                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                                     env=dict(os.environ, GATEWAY_PORT=str(PORT)), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         self.addCleanup(self._stop)
         deadline = time.monotonic() + 10
         while True:
