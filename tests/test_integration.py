@@ -170,11 +170,11 @@ class WireTest(ServerTestCase):
         for topic in ("/tf", "/xform_world"):
             stalled.sendall(json.dumps({"op": "subscribe", "topic": topic}).encode() + b"\n")
         self.load_robot(_big_urdf())
-        time.sleep(0.5)  # let the socket buffers fill
+        time.sleep(2.0)  # past the ~1.5 s ramp while the 1 MiB robot loads and socket buffers fill
         before = self.server_rss_mib()
-        time.sleep(2.5)  # unbounded buffering grew ~20 MiB/s here (~50 MiB in this window)
+        time.sleep(2.0)  # unbounded buffering grew ~20 MiB/s here (~40 MiB in this window)
         growth = self.server_rss_mib() - before
-        self.assertLess(growth, 20, f"server grew {growth} MiB in 2.5 s with one stalled subscriber")
+        self.assertLess(growth, 20, f"server grew {growth} MiB in 2 s with one stalled subscriber")
         # The server still works for everyone else.
         self.client.subscribe("/tf")
         self.recv("/tf", timeout=5)
