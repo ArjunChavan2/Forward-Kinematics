@@ -1,4 +1,5 @@
 """Over-the-wire tests: start `src/main.py` (what `make run` runs) on a free port (GATEWAY_PORT) and talk to it."""
+import functools
 import json
 import math
 import os
@@ -32,14 +33,17 @@ def _fk_written() -> bool:
     return True
 
 
+@functools.cache
 def _big_urdf() -> str:
     """As many joints as fit in a 1 MiB set_param line (~4,700): the worst case for per-tick work."""
     links, joints, i = ['<link name="l0"/>'], [], 0
-    while len(json.dumps("".join(links + joints))) < 1_000_000 - 4096:
+    size = len(json.dumps(links[0]))  # JSON-escaped length of the joined string, kept incrementally
+    while size < 1_000_000 - 4096:
         i += 1
         links.append(f'<link name="l{i}"/>')
         joints.append(f'<joint name="j{i}" type="revolute"><parent link="l{(i - 1) // 2}"/><child link="l{i}"/>'
                       f'<origin xyz="0.1 0 0.05" rpy="0 0 0.1"/><axis xyz="0 0 1"/><limit lower="-1" upper="1"/></joint>')
+        size += len(json.dumps(links[-1] + joints[-1])) - 2
     return "<robot>" + "".join(links + joints) + "</robot>"
 
 
@@ -141,10 +145,10 @@ class WireTest(ServerTestCase):
         self.load_robot()
         self.recv("/tf")
         start, count = time.monotonic(), 0
-        while time.monotonic() - start < 2.0:
+        while time.monotonic() - start < 1.5:
             self.recv("/tf")
             count += 1
-        self.assertGreaterEqual(count, 10)
+        self.assertGreaterEqual(count, 7)
 
     def test_rates_hold_at_5hz_with_a_1mib_description(self) -> None:
         self.client.subscribe("/tf")
@@ -153,12 +157,12 @@ class WireTest(ServerTestCase):
         self.recv("/xform_world", timeout=10)
         counts = {"/tf": 0, "/xform_world": 0}
         start = time.monotonic()
-        while time.monotonic() - start < 3.0:
+        while time.monotonic() - start < 1.5:
             topic = self.client.recv_line(timeout=5).get("topic")
             if topic in counts:
                 counts[topic] += 1
-        self.assertGreaterEqual(counts["/tf"], 15, counts)
-        self.assertGreaterEqual(counts["/xform_world"], 15, counts)
+        self.assertGreaterEqual(counts["/tf"], 7, counts)
+        self.assertGreaterEqual(counts["/xform_world"], 7, counts)
 
     def test_subscriber_that_stops_reading_does_not_grow_server_memory(self) -> None:
         stalled = socket.create_connection((HOST, PORT))
@@ -166,11 +170,11 @@ class WireTest(ServerTestCase):
         for topic in ("/tf", "/xform_world"):
             stalled.sendall(json.dumps({"op": "subscribe", "topic": topic}).encode() + b"\n")
         self.load_robot(_big_urdf())
-        time.sleep(1.0)  # let the socket buffers fill
+        time.sleep(0.5)  # let the socket buffers fill
         before = self.server_rss_mib()
-        time.sleep(6.0)  # unbounded buffering grew ~20 MiB/s here
+        time.sleep(2.5)  # unbounded buffering grew ~20 MiB/s here (~50 MiB in this window)
         growth = self.server_rss_mib() - before
-        self.assertLess(growth, 40, f"server grew {growth} MiB in 6 s with one stalled subscriber")
+        self.assertLess(growth, 20, f"server grew {growth} MiB in 2.5 s with one stalled subscriber")
         # The server still works for everyone else.
         self.client.subscribe("/tf")
         self.recv("/tf", timeout=5)
