@@ -98,5 +98,9 @@ and marks the result FAIL even when every test passes. Fix: add `tests/run_tests
 discovery over `tests/`, exit 1 on failure), set the Makefile's `test:` to
 `python3 tests/run_tests.py`, and add `tests/README.md` whose rule 1 says so.
 
+**Rule C — each test file must finish in 30 s.** The grader times out a file at 30 s (Project 3's
+`test_integration.py` took ~27 s locally and timed out). Grader speed is about the same as a laptop,
+so keep every file under ~15 s locally: short timing windows, no repeated expensive fixtures.
+
 **Verify before uploading:** with something already listening on 9095 (e.g. a backgrounded
 `make run`), run `make test` and each `python3 tests/test_*.py` on its own — all must pass.
