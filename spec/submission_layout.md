@@ -102,5 +102,10 @@ discovery over `tests/`, exit 1 on failure), set the Makefile's `test:` to
 `test_integration.py` took ~27 s locally and timed out). Grader speed is about the same as a laptop,
 so keep every file under ~15 s locally: short timing windows, no repeated expensive fixtures.
 
+**Reproduce grader-only failures on this Mac first** (rates, timeouts, memory): run the test with
+`taskpolicy -c background python3 tests/test_x.py`, which puts it and its child processes on the
+slower efficiency cores. That reproduced the 5 Hz failure exactly (`3 not greater than or equal to 7`)
+before the fix. A fix should pass there too.
+
 **Verify before uploading:** with something already listening on 9095 (e.g. a backgrounded
 `make run`), run `make test` and each `python3 tests/test_*.py` on its own — all must pass.
