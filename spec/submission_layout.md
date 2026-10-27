@@ -102,6 +102,11 @@ discovery over `tests/`, exit 1 on failure), set the Makefile's `test:` to
 `test_integration.py` took ~27 s locally and timed out). Grader speed is about the same as a laptop,
 so keep every file under ~15 s locally: short timing windows, no repeated expensive fixtures.
 
+**Rule D — rate requirements must hold on a slower CPU.** A publisher that recomputes everything every
+tick is CPU-bound: Project 3's `/tf` ran ~6.5 Hz on an M3 but ~4 Hz on the grader with a ~4,700-joint
+robot. Republish the cached message when inputs haven't changed (track the input objects; replace them on
+change, never mutate). Check rate tests on efficiency cores (below).
+
 **Reproduce grader-only failures on this Mac first** (rates, timeouts, memory): run the test with
 `taskpolicy -c background python3 tests/test_x.py`, which puts it and its child processes on the
 slower efficiency cores. That reproduced the 5 Hz failure exactly (`3 not greater than or equal to 7`)
