@@ -30,6 +30,10 @@ class RobotWorldStatePublisher:
     def __init__(self, registry: Registry) -> None:
         self.registry = registry
         self.global_pose = _IDENTITY_4
+        # Last /xform_world and the (/tf msg, global_pose) objects it came from: robot_state_publisher republishes the
+        # same /tf object while nothing changes, so recomposing every link each tick would be wasted work.
+        self._xform_key: tuple = ()
+        self._xform_msg: dict | None = None
         registry.subscribe(self, TF_TOPIC)
         registry.subscribe(self, GLOBAL_POSE_TOPIC)
 
@@ -51,6 +55,10 @@ class RobotWorldStatePublisher:
             self.global_pose = pose
 
     def _on_tf(self, msg: dict) -> None:
+        key = (msg, self.global_pose)
+        if self._xform_msg is not None and all(a is b for a, b in zip(key, self._xform_key)):
+            self.registry.publish(XFORM_WORLD_TOPIC, self._xform_msg)
+            return
         entries = msg.get("transforms") or []
         if not entries:
             # A robot with no joints has an empty /tf; the spec leaves /xform_world UNSPECIFIED
@@ -79,7 +87,8 @@ class RobotWorldStatePublisher:
             }
             for link_name, pose in poses.items()
         ]
-        self.registry.publish(XFORM_WORLD_TOPIC, {"transforms": out_entries})
+        self._xform_key, self._xform_msg = key, {"transforms": out_entries}
+        self.registry.publish(XFORM_WORLD_TOPIC, self._xform_msg)
 
 
 def register(registry: Registry) -> RobotWorldStatePublisher:

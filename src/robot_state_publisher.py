@@ -56,6 +56,10 @@ class RobotStatePublisher:
         self.positions: dict[str, float] = {}
         self._last_names: list[str] = []
         self._last_positions: list[float] = []
+        # Last /tf message and the (robot, positions, stamp) objects it was built from: these are replaced, never
+        # mutated, on any change, so an unchanged tick republishes it instead of redoing FK for every joint.
+        self._tf_key: tuple = ()
+        self._tf_msg: dict | None = None
         registry.subscribe(self, JOINT_STATES_TOPIC)
 
     # -- Connection protocol (for registry.subscribe) -----------------------
@@ -140,6 +144,10 @@ class RobotStatePublisher:
         current joint positions. No-op while no robot is loaded (spec: never publish /tf then)."""
         if self.robot is None:
             return
+        key = (self.robot, self.positions, self.stamp)
+        if self._tf_msg is not None and all(a is b for a, b in zip(key, self._tf_key)):
+            self.registry.publish(TF_TOPIC, self._tf_msg)
+            return
         edges = fk.joint_edges(self.robot, self.positions)
         transforms = []
         for parent, child, matrix in edges:
@@ -152,7 +160,8 @@ class RobotStatePublisher:
                     "rotation": {"x": x, "y": y, "z": z, "w": w},
                 },
             })
-        self.registry.publish(TF_TOPIC, {"transforms": transforms})
+        self._tf_key, self._tf_msg = key, {"transforms": transforms}
+        self.registry.publish(TF_TOPIC, self._tf_msg)
 
     async def publish_tf_loop(self) -> None:
         # Sleep only until the next tick's deadline: sleeping a full interval after the work made the period
