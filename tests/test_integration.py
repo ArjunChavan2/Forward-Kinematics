@@ -337,6 +337,7 @@ class DemoWireTest(ServerTestCase):
         from http.server import ThreadingHTTPServer
         import live_viewer
 
+        live_viewer.GATEWAY_PORT = PORT  # this test's runtime, not whatever holds 9095
         live_viewer.UNSAVED_PATH = os.path.join(tempfile.mkdtemp(), "unsaved.json")  # not the user's drafts
         server = ThreadingHTTPServer(("127.0.0.1", 0), live_viewer.Handler)
         threading.Thread(target=server.serve_forever, daemon=True).start()
