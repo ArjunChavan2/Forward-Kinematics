@@ -36,6 +36,8 @@ from urdf import parse_urdf  # noqa: E402
 
 HOST = "127.0.0.1"
 DEFAULT_PORT = 8803
+# The runtime's gateway port. Not client_helper's default, which is a free port reserved for tests.
+GATEWAY_PORT = int(os.environ.get("GATEWAY_PORT", "9095"))
 DEFAULT_ROBOT = os.path.join(HERE, "..", "robots", "dual_arm_robot.urdf")
 DEFAULT_FSM = os.path.join(HERE, "..", "fsm", "OrangeJustice.json")
 TOPICS = {"/xform_world": "xform", "/joint_states": "joints", "/fsm/status": "fsm"}
@@ -87,7 +89,7 @@ def bridge() -> None:
     """Keep the latest message of each topic; reconnect if the gateway restarts."""
     while True:
         try:
-            with Client() as client:
+            with Client(port=GATEWAY_PORT) as client:
                 for topic in TOPICS:
                     client.subscribe(topic)
                 while True:
@@ -110,7 +112,7 @@ class Control:
             for attempt in range(2):  # reconnect once if the gateway restarted
                 try:
                     if self._client is None:
-                        self._client = Client()
+                        self._client = Client(port=GATEWAY_PORT)
                         self._client.advertise("/joint_trajectory")
                     return fn(self._client)
                 except OSError:

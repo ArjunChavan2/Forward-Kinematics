@@ -70,9 +70,7 @@ republishes it instead of redoing FK. That keeps `/tf` at about 10 Hz even with 
   `fsm/OrangeJustice.json`, then serves http://127.0.0.1:8803/. It draws every link from `/xform_world`, has a
   slider per joint (sent on `/joint_trajectory`), a Choreography menu over `fsm/*.json`, an editor for states,
   and a Speed slider. Other forms: `python3 tools/live_viewer.py robot.urdf fsm/table.json`, or a trailing port
-  number. Known issue: its gateway client comes from `tests/client_helper.py`, whose default port has been a
-  random free port since tests stopped using 9095, so on the current code it exits with
-  `ConnectionRefusedError` instead of reaching `make demo` on 9095.
+  number. It connects to the runtime on 9095 (or `GATEWAY_PORT` if set).
 - `python3 tools/urdf_demo.py [path.urdf]` prints the parsed `RobotModel`.
 - `python3 tools/urdf_viewer.py [path.urdf] [port]` shows the link/joint tree (default port 8800).
 - `python3 tools/urdf_viewer_3d.py [path.urdf] [port]` renders zero-configuration poses with three.js (default 8801).
